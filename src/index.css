@@ -1,0 +1,182 @@
+/**
+ * FabLab Platform — Global Styles
+ * Paleta: Azul (#1D4ED8), Verde (#059669), Vermelho (#DC2626)
+ * Inspirado no FabLab MIT / Maker Movement
+ * Open Source — bem documentado para contribuidores
+ */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ── Shadcn/ui tokens ─────────────────────────────────── */
+    --background: 0 0% 97%;
+    --foreground: 220 13% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 13% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 13% 9%;
+    --primary: 221 83% 53%;        /* azul FabLab */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 13% 9%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 220 14% 96%;
+    --accent-foreground: 220 13% 9%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 221 83% 53%;
+    --radius: 0.75rem;
+
+    /* ── FabLab brand tokens ──────────────────────────────── */
+    --fab-blue:   #1D4ED8;   /* Azul principal */
+    --fab-blue-h: #1E40AF;   /* Hover do azul */
+    --fab-green:  #059669;   /* Verde maker */
+    --fab-green-h:#047857;
+    --fab-red:    #DC2626;   /* Vermelho ação */
+    --fab-red-h:  #B91C1C;
+
+    /* ── Superfícies ──────────────────────────────────────── */
+    --surface: #FFFFFF;
+    --surface-elevated: #FFFFFF;
+    --text-primary: #111827;
+    --text-secondary: #6B7280;
+    --text-tertiary: #9CA3AF;
+
+    /* ── Módulo FabLab (azul) ─────────────────────────────── */
+    --fab-primary:       var(--fab-blue);
+    --fab-primary-hover: var(--fab-blue-h);
+    --fab-bg:            #EFF6FF;
+    --fab-muted:         #BFDBFE;
+
+    /* ── Módulo Projetos (verde - ex-gifted) ──────────────── */
+    --gift-primary:       var(--fab-green);
+    --gift-primary-hover: var(--fab-green-h);
+    --gift-bg:            #ECFDF5;
+    --gift-muted:         #A7F3D0;
+
+    /* ── Status / utilitários ─────────────────────────────── */
+    --success: #16A34A;
+    --warning: #D97706;
+    --danger:  #DC2626;
+
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+    --shadow-lg: 0 12px 32px rgba(0,0,0,0.1);
+  }
+
+  .dark {
+    --background: 220 15% 6%;
+    --foreground: 0 0% 96%;
+    --card: 220 13% 12%;
+    --card-foreground: 0 0% 96%;
+    --popover: 220 13% 12%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 221 83% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 11% 16%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 220 11% 16%;
+    --muted-foreground: 220 9% 72%;
+    --accent: 220 11% 16%;
+    --accent-foreground: 0 0% 96%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 11% 20%;
+    --input: 220 11% 20%;
+    --ring: 221 83% 60%;
+
+    --fab-primary:       #3B82F6;
+    --fab-primary-hover: #60A5FA;
+    --fab-bg:            #172554;
+    --fab-muted:         #1E3A8A;
+    --gift-primary:       #10B981;
+    --gift-primary-hover: #34D399;
+    --gift-bg:            #064E3B;
+    --gift-muted:         #065F46;
+
+    --surface: #1A1D24;
+    --surface-elevated: #22262E;
+    --text-primary: #F3F4F6;
+    --text-secondary: #9CA3AF;
+    --text-tertiary: #6B7280;
+    --success: #4ADE80;
+    --warning: #FBBF24;
+    --danger:  #F87171;
+
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.2);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.25);
+    --shadow-lg: 0 12px 32px rgba(0,0,0,0.35);
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  code, pre, .mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@layer utilities {
+  .fab-primary  { color: var(--fab-primary); }
+  .fab-bg       { background-color: var(--fab-bg); }
+  .gift-primary { color: var(--gift-primary); }
+  .gift-bg      { background-color: var(--gift-bg); }
+}
+
+/* ── Animações globais ──────────────────────────────────── */
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-20px); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.page-enter  { animation: pageIn 0.2s ease-out forwards; }
+.spinner     { animation: spin 0.7s linear infinite; }
+.fade-in     { animation: fadeIn 0.3s ease forwards; }
+.slide-up    { animation: slideUp 0.35s ease forwards; }
+
+html { scroll-behavior: smooth; }
+
+/* ── Scrollbar customizada ──────────────────────────────── */
+::-webkit-scrollbar       { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
+
+/* ── Sidebar nav item visibility boost ─────────────────── */
+.dark aside button.text-muted-foreground {
+  color: hsl(220 9% 68%) !important;
+}
+.dark aside button.text-muted-foreground:hover {
+  color: hsl(0 0% 96%) !important;
+  background-color: rgba(255,255,255,0.07) !important;
+}
+.dark aside {
+  border-right-color: rgba(255,255,255,0.1) !important;
+}
