@@ -276,7 +276,7 @@ Impressora 3D Creality,Equipamento,Impressão 3D,1,1,un,Bancada 2,1,FDM 220x220x
                     <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                       <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(st.pct, 100)}%`, background: st.pct < 30 ? '#D42020' : st.pct < 60 ? '#d97706' : '#059669' }} />
                     </div>
-                    {item.min_stock > 0 && item.quantity <= item.min_stock && (
+                    {(item.min_stock ?? 0) > 0 && item.quantity <= (item.min_stock ?? 0) && (
                       <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1"><AlertTriangle size={10} /> {t('fabInventory.belowMinStock')} ({item.min_stock})</p>
                     )}
                   </div>

@@ -5,12 +5,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Calendar, User, Tag, Search, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Calendar, User, Search } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useTranslation } from 'react-i18next';
 
 const BLUE = '#1D4ED8';
-const GREEN = '#059669';
 
 interface BlogPost {
   id: string;

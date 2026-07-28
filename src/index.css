@@ -118,6 +118,18 @@
 
 @layer base {
   * { @apply border-border; }
+  html, body, #root {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  /* Scroll suave e contenção na área principal */
+  main {
+    scroll-behavior: smooth;
+    overscroll-behavior: contain;
+    /* Sem 'contain' no CSS isolation — garante que wheel events propaguem */
+    isolation: auto;
+  }
   body {
     @apply bg-background text-foreground;
     font-family: 'Space Grotesk', system-ui, sans-serif;

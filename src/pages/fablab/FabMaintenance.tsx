@@ -3,13 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { Plus, Wrench, AlertTriangle, CheckCircle2, Clock, Search, Trash2, Pencil, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useAuthStore } from '@/stores/authStore';
 import { useInventoryStore } from '@/stores/inventoryStore';
 import { PageTransition } from '@/components/layout/PageTransition';
-import { supabase } from '@/lib/supabase';
 
 // ── Types ─────────────────────────────────────────────────────────
 type TicketStatus = 'aberto' | 'em_andamento' | 'aguardando_peca' | 'resolvido';
@@ -146,16 +144,16 @@ export function FabMaintenance() {
 
   const handleStatusChange = (id: string, status: TicketStatus) => {
     const now = new Date().toISOString();
-    setTickets(prev => prev.map(t => t.id === id ? {
-      ...t,
+    setTickets(prev => prev.map(tk => tk.id === id ? {
+      ...tk,
       status,
-      resolved_at: status === 'resolvido' ? now : t.resolved_at,
-      logs: [...t.logs, {
+      resolved_at: status === 'resolvido' ? now : tk.resolved_at,
+      logs: [...tk.logs, {
         id: crypto.randomUUID(), date: now,
         author: user?.name || '',
         note: `${t('fabMaintenance.statusChangedTo')}: ${STATUS_CONFIG[status].label}`,
       }],
-    } : t));
+    } : tk));
   };
 
   const handleAddLog = (id: string) => {
@@ -180,8 +178,6 @@ export function FabMaintenance() {
     setEditId(t.id);
     setAddOpen(true);
   };
-
-  const detail = tickets.find(t => t.id === detailId);
 
   return (
     <PageTransition>

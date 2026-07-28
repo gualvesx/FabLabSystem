@@ -19,7 +19,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, Edit2, Trash2, MoreVertical, Shield, Settings,
-         Upload, Download, Users, UserCheck, AlertCircle, CheckCircle2 } from 'lucide-react';
+         Upload, Users, UserCheck, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -141,7 +141,6 @@ export function FabUsers() {
   // Modais usuário
   const [userModal, setUserModal]   = useState(false);
   const [editUser, setEditUser]     = useState<User | null>(null);
-  const [deleteUser, setDeleteUser] = useState<User | null>(null);
   const [userForm, setUserForm]     = useState(EMPTY_USER);
   const [saving, setSaving]         = useState(false);
 
@@ -177,13 +176,13 @@ export function FabUsers() {
   const handleSaveUser = async () => {
     if (!userForm.name || !userForm.email) return;
     setSaving(true);
-    const payload = { name: userForm.name, email: userForm.email, role: userForm.role, unit: userForm.unit, class_id: userForm.class_id || null };
+    const payload = { name: userForm.name, email: userForm.email, role: userForm.role, unit: userForm.unit, class_id: userForm.class_id || undefined };
     if (editUser) {
       await supabase.from('users').update(payload).eq('id', editUser.id);
       setUsers(p => p.map(u => u.id === editUser.id ? { ...u, ...payload } : u));
     } else {
       // Criação via invite do Supabase Auth
-      const { data } = await supabase.auth.admin?.inviteUserByEmail(userForm.email, { data: { name: userForm.name, role: userForm.role, unit: userForm.unit } }).catch(() => ({ data: null }));
+      await supabase.auth.admin?.inviteUserByEmail(userForm.email, { data: { name: userForm.name, role: userForm.role, unit: userForm.unit } }).catch(() => ({ data: null }));
     }
     setSaving(false);
     setUserModal(false);

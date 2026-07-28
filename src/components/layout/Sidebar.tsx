@@ -18,7 +18,7 @@ import type { UserRole } from '@/types';
 import {
   Home, LayoutDashboard, Package, Calendar, Lightbulb,
   BarChart3, Users, GraduationCap, FileText, HelpCircle,
-  BookOpen, FolderKanban, Layers, Settings, AlertTriangle, FolderOpen, Cpu,
+  BookOpen, FolderKanban, FolderOpen, Cpu,
 } from 'lucide-react';
 
 interface SidebarProps {

@@ -2,12 +2,11 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Plus, Search, Trash2, Pencil, Wrench, CheckCircle2,
-  AlertTriangle, Clock, Droplets, Calendar, ChevronDown,
-  Power, PowerOff, Settings,
+  Clock, Droplets, Calendar, ChevronDown,
+  PowerOff, Settings,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { useAuthStore } from '@/stores/authStore';

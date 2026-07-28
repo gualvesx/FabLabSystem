@@ -1,5 +1,4 @@
 import { useMemo, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { Package, Calendar, CheckCircle, AlertTriangle, MapPin } from 'lucide-react';
 import { useInventoryStore } from '@/stores/inventoryStore';
 import { useScheduleStore } from '@/stores/scheduleStore';
@@ -19,7 +18,6 @@ function StatCard({ label, value, sub, icon, color }: { label: string; value: nu
 }
 
 export function FabDashboard() {
-  const { t } = useTranslation();
   const { items, fetchItems } = useInventoryStore();
   const { schedules, fetchSchedules } = useScheduleStore();
   const { user } = useAuthStore();
@@ -41,8 +39,8 @@ export function FabDashboard() {
     <PageTransition>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-extrabold">{t('sidebar.dashboard')}</h1>
-          <p className="text-sm text-muted-foreground">{t('fabDashboard.overview')}</p>
+          <h1 className="text-xl font-extrabold">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">Visão geral do FabLab</p>
         </div>
 
         {/* Card de unidade */}
@@ -50,7 +48,7 @@ export function FabDashboard() {
           <div className="flex items-center gap-2 bg-card border border-border rounded-xl px-4 py-3 shadow-sm flex-shrink-0">
             <MapPin size={15} className="text-[#D42020]" />
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground leading-none mb-0.5">{t('app.unit')}</div>
+              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground leading-none mb-0.5">Unidade</div>
               <div className="text-sm font-semibold leading-tight">{user.unit}</div>
             </div>
           </div>
@@ -58,18 +56,18 @@ export function FabDashboard() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard label={t('fabDashboard.registeredItems')} value={total} sub={t('fabDashboard.inInventory')} icon={<Package size={18} />} color="#D42020" />
-        <StatCard label={t('fabDashboard.itemsCheckedOut')} value={out} sub={t('fabDashboard.outOfLab')} icon={<AlertTriangle size={18} />} color="#9CA3AF" />
-        <StatCard label={t('fabDashboard.todaySchedules')} value={todaySched} sub={`${t('fabDashboard.total')}: ${schedules.length}`} icon={<Calendar size={18} />} color="#2563EB" />
-        <StatCard label={t('fabDashboard.completed')} value={completed} sub={t('sidebar.schedule')} icon={<CheckCircle size={18} />} color="#16A34A" />
+        <StatCard label="Itens cadastrados" value={total} sub="no inventário" icon={<Package size={18} />} color="#D42020" />
+        <StatCard label="Itens em saída" value={out} sub="fora do lab" icon={<AlertTriangle size={18} />} color="#9CA3AF" />
+        <StatCard label="Agendamentos hoje" value={todaySched} sub={`total: ${schedules.length}`} icon={<Calendar size={18} />} color="#2563EB" />
+        <StatCard label="Concluídos" value={completed} sub="agendamentos" icon={<CheckCircle size={18} />} color="#16A34A" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-border font-bold text-sm">{t('fabDashboard.upcomingSchedules')}</div>
+          <div className="px-5 py-4 border-b border-border font-bold text-sm">Próximos agendamentos</div>
           <div className="divide-y divide-border">
             {upcoming.length === 0 && (
-              <div className="px-5 py-6 text-sm text-muted-foreground text-center">{t('fabDashboard.noPendingSchedules')}</div>
+              <div className="px-5 py-6 text-sm text-muted-foreground text-center">Nenhum agendamento pendente</div>
             )}
             {upcoming.map((s) => (
               <div key={s.id} className="px-5 py-3 flex items-center justify-between">
@@ -85,16 +83,16 @@ export function FabDashboard() {
 
         <div className="bg-card border border-border rounded-xl overflow-hidden flex flex-col" style={{ maxHeight: '420px' }}>
           <div className="px-5 py-4 border-b border-border font-bold text-sm flex items-center justify-between flex-shrink-0">
-            <span>{t('fabDashboard.inventoryStatus')}</span>
+            <span>Status do inventário</span>
             {(() => {
-              const low = items.filter(i => {
+              const atencao = items.filter(i => {
                 const qty = i.quantity ?? 0;
                 const min = i.min_stock ?? 0;
                 return qty === 0 || (min > 0 && qty <= min);
               });
-              return low.length > 0 ? (
+              return atencao.length > 0 ? (
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: '#D4202015', color: '#D42020' }}>
-                  {low.length} {t('fabDashboard.itemsNeedAttention')}
+                  {atencao.length} item(s) com atenção
                 </span>
               ) : null;
             })()}
@@ -113,7 +111,7 @@ export function FabDashboard() {
                 return (
                   <div className="px-5 py-6 text-sm text-muted-foreground text-center">
                     <CheckCircle size={28} className="mx-auto mb-2 opacity-20" />
-                    {t('fabDashboard.allStockAdequate')}
+                    Todos os itens com estoque adequado
                   </div>
                 );
               }
@@ -123,16 +121,16 @@ export function FabDashboard() {
                 const min = i.min_stock ?? 0;
                 const isEmpty = qty === 0;
                 const color = isEmpty ? '#D42020' : '#d97706';
-                const label = isEmpty ? t('fabDashboard.outOfStock') : t('fabDashboard.lowStock');
+                const label = isEmpty ? 'Esgotado' : 'Estoque baixo';
                 return (
                   <div key={i.id} className="px-5 py-3 flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-sm font-semibold truncate">{i.name}</div>
                       <div className="text-xs text-muted-foreground mt-0.5">
                         {i.category} · <span style={{ color }} className="font-semibold">
-                          {qty} {i.unit_measure || t('fabDashboard.unitAbbrev')}
+                          {qty} {i.unit_measure || 'un'}
                         </span>
-                        {min > 0 && <span className="text-muted-foreground"> / {t('fabDashboard.minAbbrev')}. {min}</span>}
+                        {min > 0 && <span className="text-muted-foreground"> / mín. {min}</span>}
                       </div>
                     </div>
                     <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"

@@ -8,7 +8,7 @@
  *   - projects: módulo de projetos (inclui altas habilidades, maker, etc.)
  *   - student: área do aluno
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
@@ -28,6 +28,22 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [collapsed] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
+
+  // Fix: garante que scroll do mouse funcione no main mesmo com overflow:hidden no #root
+  const handleWheel = useCallback((e: WheelEvent) => {
+    const el = mainRef.current;
+    if (!el) return;
+    el.scrollTop += e.deltaY;
+  }, []);
+
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    // passive:false não é necessário aqui pois não prevenimos o default
+    el.addEventListener('wheel', handleWheel, { passive: true });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [handleWheel]);
 
   // Carrega classes uma vez
   useEffect(() => { if (classes.length === 0) fetchClasses(); }, []);
@@ -81,15 +97,14 @@ export function AppLayout() {
 
   const activeModule = getActiveModule();
 
-  // Layout para alunos (sem troca de módulo)
   if (user.role === 'student') {
     return (
-      <div className="h-screen flex flex-col bg-background">
+      <div className="h-full flex flex-col bg-background">
         <UnitSelectPopup />
         <TopBar activeModule="student" onModuleChange={() => {}} />
-        <div className="flex flex-1 min-h-0">
+        <div className="flex flex-1 min-h-0 overflow-hidden">
           <Sidebar module="student" role={user.role} collapsed={collapsed} />
-          <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
+          <main ref={mainRef} className="flex-1 p-6 lg:p-8 overflow-y-auto focus:outline-none" tabIndex={-1}>
             <Outlet />
           </main>
         </div>
@@ -98,13 +113,13 @@ export function AppLayout() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-background">
+    <div className="h-full flex flex-col bg-background">
       {/* Popup de seleção de unidade — aparece na primeira visita */}
       <UnitSelectPopup />
       <TopBar activeModule={activeModule} onModuleChange={handleModuleChange} />
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         <Sidebar module={activeModule} role={user.role} collapsed={collapsed} />
-        <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
+        <main ref={mainRef} className="flex-1 p-6 lg:p-8 overflow-y-auto focus:outline-none" tabIndex={-1}>
           <Outlet />
         </main>
       </div>

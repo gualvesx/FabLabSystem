@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Upload, File, Download, Trash2, Search, FolderOpen,
   AlertCircle, CheckCircle2, X, Plus, Eye, Edit3, Save,
-  Calendar, User, ChevronLeft, Image, Tag, Link2,
+  Calendar, User, ChevronLeft, Image, Tag,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -96,14 +96,14 @@ async function compressFile(file: File): Promise<Blob> {
   const chunks: Uint8Array[] = [];
   const reader = stream.getReader();
   while (true) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); }
-  return new Blob(chunks, { type: 'application/gzip' });
+  return new Blob(chunks as BlobPart[], { type: 'application/gzip' });
 }
 async function decompressBlob(blob: Blob): Promise<Blob> {
   const stream = blob.stream().pipeThrough(new DecompressionStream('gzip'));
   const chunks: Uint8Array[] = [];
   const reader = stream.getReader();
   while (true) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); }
-  return new Blob(chunks);
+  return new Blob(chunks as BlobPart[]);
 }
 
 // ── Markdown renderer (reusado do FabBlog) ───────────────────────────────
@@ -330,12 +330,11 @@ type UploadStep = 'idle'|'compressing'|'uploading'|'saving'|'done'|'error';
 
 // ── Main Component ────────────────────────────────────────────────────────
 export function FabFiles() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const CAT_CONFIG = useCatConfig();
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin' || user?.role === 'professor';
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const imgInputRef  = useRef<HTMLInputElement>(null);
 
   const [posts,    setPosts]    = useState<FilePost[]>([]);
   const [loading,  setLoading]  = useState(true);

@@ -15,11 +15,10 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, useInView, AnimatePresence } from 'framer-motion';
-import { ChevronDown, Menu, X, LogIn, ArrowRight, Globe, Sun, Moon, Settings } from 'lucide-react';
+import { Menu, X, LogIn, Sun, Moon, Settings } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { useLanguageStore } from '@/stores/languageStore';
-import { FABLAB_COUNTRIES } from '@/lib/constants';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
@@ -296,16 +295,6 @@ const PUZZLE_CONNECTIONS = [
   ['proj', 'blog'], ['sug', 'blog'], ['blog', 'usr'], ['proj', 'usr'],
 ];
 
-function useIsMobile() {
-  const [m, setM] = useState(() => window.innerWidth < 768);
-  useEffect(() => {
-    const fn = () => setM(window.innerWidth < 768);
-    window.addEventListener('resize', fn);
-    return () => window.removeEventListener('resize', fn);
-  }, []);
-  return m;
-}
-
 function useScrollY() {
   const [y, setY] = useState(0);
   useEffect(() => {
@@ -450,7 +439,7 @@ const InteractiveBook = memo(function InteractiveBook() {
       <div className="flex items-center gap-6">
         <button onClick={() => go(-1)} className="w-10 h-10 rounded-full border border-white/20 flex items-center justify-center text-white/60 hover:text-white hover:border-white/50 transition-all">‹</button>
         <div className="flex gap-2">
-          {MANIFESTO_PAGES.map((p, i) => (
+          {MANIFESTO_PAGES.map((_p, i) => (
             <button key={i} onClick={() => { setDir(i > page ? 1 : -1); setTimeout(() => setPage(i), 0); }}
               className="transition-all rounded-full"
               style={{ width: i === page ? 24 : 8, height: 8, background: i === page ? current.color : 'rgba(255,255,255,0.2)' }}
@@ -1317,15 +1306,6 @@ const FABLAB_TIMELINE = [
   },
 ];
 
-const FABLAB_FACTS = [
-  { icon: 'printer3d', label: 'Impressoras 3D', desc: 'Prototipagem rápida em plástico, resina e metal' },
-  { icon: 'zap', label: 'Cortadora a Laser', desc: 'Corte e gravação em madeira, acrílico e tecido' },
-  { icon: 'tool', label: 'Fresadora CNC', desc: 'Usinagem de precisão em alumínio e madeira' },
-  { icon: 'cpu', label: 'Eletrônica', desc: 'Arduino, Raspberry Pi e solda para prototipagem' },
-  { icon: 'scissors', label: 'Costura Digital', desc: 'Bordado computadorizado e têxteis eletrônicos' },
-  { icon: 'tool', label: 'Bancadas Maker', desc: 'Ferramentas manuais, torno e bancadas equipadas' },
-];
-
 /* ── NeilTooltip — hover micro-biography for Neil Gershenfeld ── */
 function NeilTooltip({ children }: { children: React.ReactNode }) {
   const [visible, setVisible] = useState(false);
@@ -2062,14 +2042,8 @@ function StaircaseTimeline({ items }: { items: typeof FABLAB_TIMELINE }) {
 }
 
 const FabLabSection = memo(function FabLabSection() {
-  const [hoveredFact, setHoveredFact] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: '-80px' });
-
-  const leftFacts = FABLAB_FACTS.slice(0, 3);
-  const rightFacts = FABLAB_FACTS.slice(3, 6);
-
-  const factColors = ['#1D4ED8', '#059669', '#DC2626', '#7c3aed', '#ea580c', '#0891b2'];
 
   return (
     <div ref={ref} className="space-y-0">
@@ -2546,7 +2520,7 @@ const StackedCardsSection = memo(function StackedCardsSection({ BLUE }: { BLUE: 
 
                   {/* Dots: which card we're on */}
                   <div className="flex gap-2">
-                    {STACK_CARDS.map((c, j) => (
+                    {STACK_CARDS.map((_c, j) => (
                       <div
                         key={j}
                         className="rounded-full transition-all"
@@ -2615,11 +2589,11 @@ function InteractiveHero({
 }: {
   slide: number; setSlide: (n: number) => void; goToApp: () => void;
   scrollTo: (id: string) => void; isAuthenticated: boolean;
-  heroTagRef: React.RefObject<HTMLSpanElement>;
-  heroH1Ref: React.RefObject<HTMLHeadingElement>;
-  heroDescRef: React.RefObject<HTMLParagraphElement>;
-  heroPhraseRef: React.RefObject<HTMLDivElement>;
-  heroBtnsRef: React.RefObject<HTMLDivElement>;
+  heroTagRef: React.RefObject<HTMLSpanElement | null>;
+  heroH1Ref: React.RefObject<HTMLHeadingElement | null>;
+  heroDescRef: React.RefObject<HTMLParagraphElement | null>;
+  heroPhraseRef: React.RefObject<HTMLDivElement | null>;
+  heroBtnsRef: React.RefObject<HTMLDivElement | null>;
   BLUE: string; GREEN: string; RED: string;
 }) {
   const containerRef = useRef<HTMLElement>(null);
