@@ -43,19 +43,15 @@ function renderMarkdown(md: string): string {
   return html;
 }
 
+const FABLAB_LOGO_URL = 'https://images.seeklogo.com/logo-png/20/2/fablab-logo-png_seeklogo-203707.png';
+
 function FabLabLogo({ size = 28 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-      <rect width="32" height="32" rx="8" fill={BLUE} />
-      <polygon points="16,5 27,11 27,21 16,27 5,21 5,11" fill="none" stroke="white" strokeWidth="1.8" />
-      <circle cx="16" cy="16" r="4" fill="white" />
-      <line x1="16" y1="9" x2="16" y2="12" stroke="white" strokeWidth="1.5" />
-      <line x1="16" y1="20" x2="16" y2="23" stroke="white" strokeWidth="1.5" />
-      <line x1="10" y1="12.5" x2="12.6" y2="14" stroke="white" strokeWidth="1.5" />
-      <line x1="19.4" y1="18" x2="22" y2="19.5" stroke="white" strokeWidth="1.5" />
-      <line x1="22" y1="12.5" x2="19.4" y2="14" stroke="white" strokeWidth="1.5" />
-      <line x1="12.6" y1="18" x2="10" y2="19.5" stroke="white" strokeWidth="1.5" />
-    </svg>
+    <img
+      src={FABLAB_LOGO_URL}
+      alt="FabLab"
+      style={{ height: size, width: 'auto', objectFit: 'contain', filter: 'brightness(0) invert(1)' }}
+    />
   );
 }
 

@@ -8,7 +8,7 @@
  *   - projects: módulo de projetos (inclui altas habilidades, maker, etc.)
  *   - student: área do aluno
  */
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
@@ -29,21 +29,6 @@ export function AppLayout() {
   const location = useLocation();
   const [collapsed] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
-
-  // Fix: garante que scroll do mouse funcione no main mesmo com overflow:hidden no #root
-  const handleWheel = useCallback((e: WheelEvent) => {
-    const el = mainRef.current;
-    if (!el) return;
-    el.scrollTop += e.deltaY;
-  }, []);
-
-  useEffect(() => {
-    const el = mainRef.current;
-    if (!el) return;
-    // passive:false não é necessário aqui pois não prevenimos o default
-    el.addEventListener('wheel', handleWheel, { passive: true });
-    return () => el.removeEventListener('wheel', handleWheel);
-  }, [handleWheel]);
 
   // Carrega classes uma vez
   useEffect(() => { if (classes.length === 0) fetchClasses(); }, []);

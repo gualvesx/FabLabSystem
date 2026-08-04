@@ -120,14 +120,12 @@
   * { @apply border-border; }
   html, body, #root {
     height: 100%;
-    overflow: hidden;
   }
 
-  /* Scroll suave e contenção na área principal */
+  /* Scroll suave apenas dentro da área principal do app autenticado (AppLayout) */
   main {
     scroll-behavior: smooth;
     overscroll-behavior: contain;
-    /* Sem 'contain' no CSS isolation — garante que wheel events propaguem */
     isolation: auto;
   }
   body {
