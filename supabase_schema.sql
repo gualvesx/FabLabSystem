@@ -1,753 +1,381 @@
--- ================================================================
--- FabLab Platform · Schema PostgreSQL v2026.1
--- Baseado na Fab Charter MIT · Open Source
---
--- Instruções:
---   1. Acesse: Supabase Dashboard → SQL Editor → New Query
---   2. Cole todo este arquivo e execute
---   3. As classes padrão serão criadas automaticamente
---
--- Changelog v2026.1 (vs v2025.4):
---   + Tabela suggestions: campos suggestion_type e category
---   + Tabela projects: campos status, cover_url, has_quiz, has_students
---   + Tabela students: campo project_id (FK para projects)
---   + Tabela users: campo avatar_url
---   + Tabela fablab_units: nova tabela para unidades
---   + Índices adicionais para performance
---   + Rotas atualizadas para módulo /projects/* (ex-/gifted/*)
--- ================================================================
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
 
-create extension if not exists "uuid-ossp";
-create extension if not exists "pg_trgm";
-
--- ================================================================
--- FUNÇÃO AUXILIAR — atualiza updated_at automaticamente
--- ================================================================
-create or replace function public.set_updated_at()
-returns trigger language plpgsql as $$
-begin new.updated_at = now(); return new; end;
-$$;
-
--- ================================================================
--- FUNÇÕES DE AUTORIZAÇÃO
--- Usadas nas RLS policies abaixo
--- ================================================================
-
-/** Retorna o role do usuário autenticado */
-create or replace function public.current_user_role()
-returns text language sql stable security definer set search_path = public as $$
-  select role from public.users where id = auth.uid();
-$$;
-
-/** true se o usuário é admin */
-create or replace function public.is_admin()
-returns boolean language sql stable security definer set search_path = public as $$
-  select coalesce((select role = 'admin' from public.users where id = auth.uid()), false);
-$$;
-
-/** true se admin ou professor */
-create or replace function public.is_admin_or_professor()
-returns boolean language sql stable security definer set search_path = public as $$
-  select coalesce((select role in ('admin','professor') from public.users where id = auth.uid()), false);
-$$;
-
--- ================================================================
--- 1. UNIDADES FAB LAB
--- Cada instalação pode ter múltiplas unidades (ex: FabLab Central, Norte...)
--- ================================================================
-create table if not exists public.fablab_units (
-  id          uuid        primary key default gen_random_uuid(),
-  name        text        not null unique,
-  city        text        not null default '',
-  state       text        not null default '',
-  country     text        not null default 'Brasil',
-  address     text        not null default '',
-  contact     text        not null default '',
-  description text        not null default '',
-  active      boolean     not null default true,
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
+CREATE TABLE public.user_classes (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  base_role text NOT NULL DEFAULT 'professor'::text CHECK (base_role = ANY (ARRAY['admin'::text, 'professor'::text, 'funcionario'::text, 'student'::text])),
+  color text NOT NULL DEFAULT '#2563eb'::text,
+  permissions jsonb NOT NULL DEFAULT '[]'::jsonb,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT user_classes_pkey PRIMARY KEY (id)
 );
-
-create trigger tr_fablab_units_updated_at before update on public.fablab_units
-  for each row execute procedure public.set_updated_at();
-
--- ================================================================
--- 2. CLASSES DE USUÁRIO (grupos de permissão)
--- ================================================================
-create table if not exists public.user_classes (
-  id          uuid        primary key default gen_random_uuid(),
-  name        text        not null,
-  base_role   text        not null default 'professor'
-                check (base_role in ('admin','professor','funcionario','student')),
-  color       text        not null default '#1D4ED8',
-  permissions jsonb       not null default '[]',
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
+CREATE TABLE public.users (
+  id uuid NOT NULL,
+  name text NOT NULL DEFAULT ''::text,
+  email text NOT NULL DEFAULT ''::text,
+  role text NOT NULL DEFAULT 'professor'::text CHECK (role = ANY (ARRAY['admin'::text, 'professor'::text, 'funcionario'::text, 'student'::text])),
+  class_id uuid,
+  unit text NOT NULL DEFAULT ''::text,
+  active boolean NOT NULL DEFAULT true,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT users_pkey PRIMARY KEY (id),
+  CONSTRAINT users_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id),
+  CONSTRAINT users_class_id_fkey FOREIGN KEY (class_id) REFERENCES public.user_classes(id)
 );
-
-create trigger tr_user_classes_updated_at before update on public.user_classes
-  for each row execute procedure public.set_updated_at();
-
--- ================================================================
--- 3. USUÁRIOS (espelho do auth.users com perfil público)
--- ================================================================
-create table if not exists public.users (
-  id          uuid        primary key references auth.users on delete cascade,
-  name        text        not null default '',
-  email       text        not null default '',
-  role        text        not null default 'professor'
-                check (role in ('admin','professor','funcionario','student')),
-  class_id    uuid        references public.user_classes on delete set null,
-  unit        text        not null default '',
-  avatar_url  text        not null default '',   -- URL de avatar personalizado
-  active      boolean     not null default true,
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
+CREATE TABLE public.movements (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  item_id uuid,
+  item_name text NOT NULL DEFAULT ''::text,
+  action text NOT NULL CHECK (action = ANY (ARRAY['entrada'::text, 'saida'::text])),
+  quantity integer NOT NULL DEFAULT 1 CHECK (quantity > 0),
+  responsible text NOT NULL DEFAULT ''::text,
+  notes text NOT NULL DEFAULT ''::text,
+  moved_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT movements_pkey PRIMARY KEY (id)
 );
-
-create index if not exists idx_users_role   on public.users (role);
-create index if not exists idx_users_active on public.users (active);
-create index if not exists idx_users_class  on public.users (class_id);
-create index if not exists idx_users_unit   on public.users (unit);
-create unique index if not exists idx_users_email on public.users (email) where email <> '';
-
-create trigger tr_users_updated_at before update on public.users
-  for each row execute procedure public.set_updated_at();
-
-/** Cria perfil automaticamente ao registrar novo usuário */
-create or replace function public.handle_new_user()
-returns trigger language plpgsql security definer set search_path = public as $$
-begin
-  insert into public.users (id, email, name, role, unit, active)
-  values (
-    new.id,
-    coalesce(new.email, ''),
-    coalesce(new.raw_user_meta_data->>'name', split_part(coalesce(new.email,'u'),'@',1)),
-    coalesce(new.raw_user_meta_data->>'role', 'professor'),
-    coalesce(new.raw_user_meta_data->>'unit', ''),
-    true
-  )
-  on conflict (id) do update
-    set email = excluded.email, updated_at = now()
-    where public.users.email <> excluded.email;
-  return new;
-end;
-$$;
-
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();
-
--- ================================================================
--- 4. INVENTÁRIO
--- ================================================================
-create table if not exists public.inventory_items (
-  id              uuid        primary key default gen_random_uuid(),
-  name            text        not null,
-  category        text        not null default 'Equipamento'
-                    check (category in ('Equipamento','Eletrônico','Ferramenta','Insumo','Material','Consumível','EPI','Outro')),
-  subcategory     text        not null default '',
-  quantity        integer     not null default 0  check (quantity >= 0),
-  total           integer     not null default 1  check (total >= 0),
-  unit_measure    text        not null default 'un',
-  status          text        not null default 'in' check (status in ('in','out')),
-  description     text        not null default '',
-  location        text        not null default '',
-  min_stock       integer     not null default 0  check (min_stock >= 0),
-  unit            text        not null default '',   -- unidade do FabLab dono do item
-  last_action     text        not null default '',
-  last_action_by  text        not null default '',
-  created_at      timestamptz not null default now(),
-  updated_at      timestamptz not null default now()
+CREATE TABLE public.schedules (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  date date NOT NULL,
+  start_time time without time zone,
+  end_time time without time zone,
+  responsible text NOT NULL DEFAULT ''::text,
+  class_name text NOT NULL DEFAULT ''::text,
+  notes text NOT NULL DEFAULT ''::text,
+  status text NOT NULL DEFAULT 'pendente'::text CHECK (status = ANY (ARRAY['pendente'::text, 'confirmado'::text, 'concluido'::text, 'cancelado'::text, 'remarcado'::text])),
+  created_by uuid,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT schedules_pkey PRIMARY KEY (id),
+  CONSTRAINT schedules_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id)
 );
-
-create index if not exists idx_inv_category  on public.inventory_items (category);
-create index if not exists idx_inv_status    on public.inventory_items (status);
-create index if not exists idx_inv_unit      on public.inventory_items (unit);
-create index if not exists idx_inv_name_trgm on public.inventory_items using gin (name gin_trgm_ops);
-
-create trigger tr_inventory_updated_at before update on public.inventory_items
-  for each row execute procedure public.set_updated_at();
-
-create table if not exists public.movements (
-  id          uuid        primary key default gen_random_uuid(),
-  item_id     uuid        references public.inventory_items on delete set null,
-  item_name   text        not null default '',
-  action      text        not null check (action in ('entrada','saida')),
-  quantity    integer     not null default 1 check (quantity > 0),
-  responsible text        not null default '',
-  notes       text        not null default '',
-  moved_at    timestamptz not null default now()
+CREATE TABLE public.schedule_materials (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  schedule_id uuid NOT NULL,
+  item_id uuid,
+  item_name text NOT NULL,
+  quantity_used integer NOT NULL DEFAULT 1 CHECK (quantity_used > 0),
+  registered_by text NOT NULL DEFAULT ''::text,
+  registered_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT schedule_materials_pkey PRIMARY KEY (id),
+  CONSTRAINT schedule_materials_schedule_id_fkey FOREIGN KEY (schedule_id) REFERENCES public.schedules(id)
 );
-
-create index if not exists idx_movements_item on public.movements (item_id, moved_at desc);
-create index if not exists idx_movements_date on public.movements (moved_at desc);
-
--- ================================================================
--- 5. AGENDAMENTOS
--- ================================================================
-create table if not exists public.schedules (
-  id          uuid        primary key default gen_random_uuid(),
-  title       text        not null,
-  date        date        not null,
-  start_time  time,
-  end_time    time,
-  responsible text        not null default '',
-  class_name  text        not null default '',
-  notes       text        not null default '',
-  status      text        not null default 'pendente'
-                check (status in ('pendente','confirmado','concluido','cancelado','remarcado')),
-  unit        text        not null default '',   -- unidade do agendamento
-  created_by  uuid        references public.users on delete set null,
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
+CREATE TABLE public.suggestions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  description text NOT NULL DEFAULT ''::text,
+  tags ARRAY NOT NULL DEFAULT '{}'::text[],
+  author text NOT NULL DEFAULT ''::text,
+  author_id uuid,
+  votes integer NOT NULL DEFAULT 0 CHECK (votes >= 0),
+  status text NOT NULL DEFAULT 'open'::text CHECK (status = ANY (ARRAY['open'::text, 'approved'::text, 'rejected'::text])),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  suggestion_type text NOT NULL DEFAULT 'geral'::text CHECK (suggestion_type = ANY (ARRAY['site'::text, 'fablab'::text, 'geral'::text])),
+  category text NOT NULL DEFAULT 'Outro'::text,
+  CONSTRAINT suggestions_pkey PRIMARY KEY (id),
+  CONSTRAINT suggestions_author_id_fkey FOREIGN KEY (author_id) REFERENCES public.users(id)
 );
-
-create index if not exists idx_schedules_date   on public.schedules (date, status);
-create index if not exists idx_schedules_status on public.schedules (status);
-create index if not exists idx_schedules_unit   on public.schedules (unit);
-
-create trigger tr_schedules_updated_at before update on public.schedules
-  for each row execute procedure public.set_updated_at();
-
-create table if not exists public.schedule_materials (
-  id              uuid        primary key default gen_random_uuid(),
-  schedule_id     uuid        not null references public.schedules on delete cascade,
-  item_id         uuid        references public.inventory_items on delete set null,
-  item_name       text        not null,
-  quantity_used   integer     not null default 1 check (quantity_used > 0),
-  registered_by   text        not null default '',
-  registered_at   timestamptz not null default now()
+CREATE TABLE public.projects (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  description text NOT NULL DEFAULT ''::text,
+  type text NOT NULL DEFAULT 'Outro'::text,
+  link text NOT NULL DEFAULT ''::text,
+  author text NOT NULL DEFAULT ''::text,
+  author_id uuid,
+  class_name text NOT NULL DEFAULT ''::text,
+  tags ARRAY NOT NULL DEFAULT '{}'::text[],
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  status text NOT NULL DEFAULT 'ativo'::text CHECK (status = ANY (ARRAY['ativo'::text, 'concluido'::text, 'arquivado'::text])),
+  CONSTRAINT projects_pkey PRIMARY KEY (id),
+  CONSTRAINT projects_author_id_fkey FOREIGN KEY (author_id) REFERENCES public.users(id)
 );
-
--- ================================================================
--- 6. SUGESTÕES
--- Dois canais: melhorias para o site (suggestion_type='site')
---              ideias para FabLabs  (suggestion_type='fablab')
--- ================================================================
-create table if not exists public.suggestions (
-  id              uuid        primary key default gen_random_uuid(),
-  title           text        not null,
-  description     text        not null default '',
-  tags            text[]      not null default '{}',
-  author          text        not null default '',
-  author_id       uuid        references public.users on delete set null,
-  votes           integer     not null default 0 check (votes >= 0),
-  status          text        not null default 'open'
-                    check (status in ('open','approved','rejected')),
-  -- NOVO: tipo diferencia o canal da sugestão
-  suggestion_type text        not null default 'geral'
-                    check (suggestion_type in ('site','fablab','geral')),
-  -- NOVO: categoria para o filtro "organizadores"
-  category        text        not null default 'Outro',
-  created_at      timestamptz not null default now(),
-  updated_at      timestamptz not null default now()
+CREATE TABLE public.blog_posts (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  content text NOT NULL DEFAULT ''::text,
+  cover_url text NOT NULL DEFAULT ''::text,
+  tags ARRAY NOT NULL DEFAULT '{}'::text[],
+  author text NOT NULL DEFAULT ''::text,
+  author_id uuid,
+  author_role text NOT NULL DEFAULT ''::text,
+  published boolean NOT NULL DEFAULT false,
+  views integer NOT NULL DEFAULT 0,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT blog_posts_pkey PRIMARY KEY (id),
+  CONSTRAINT blog_posts_author_id_fkey FOREIGN KEY (author_id) REFERENCES public.users(id)
 );
-
-create index if not exists idx_suggestions_type   on public.suggestions (suggestion_type);
-create index if not exists idx_suggestions_status on public.suggestions (status);
-create index if not exists idx_suggestions_votes  on public.suggestions (votes desc);
-
-create trigger tr_suggestions_updated_at before update on public.suggestions
-  for each row execute procedure public.set_updated_at();
-
--- ================================================================
--- 7. PROJETOS MAKER
--- Agora multi-tipo: Altas Habilidades, Maker, Robótica, etc.
--- Cada projeto pode ter alunos, quizzes e propostas vinculados.
--- ================================================================
-create table if not exists public.projects (
-  id           uuid        primary key default gen_random_uuid(),
-  title        text        not null,
-  description  text        not null default '',
-  type         text        not null default 'Outro',  -- ver PROJECT_TYPES em constants.ts
-  link         text        not null default '',
-  author       text        not null default '',
-  author_id    uuid        references public.users on delete set null,
-  class_name   text        not null default '',
-  tags         text[]      not null default '{}',
-  -- NOVO: campos de gestão
-  status       text        not null default 'ativo'
-                 check (status in ('ativo','concluido','arquivado')),
-  cover_url    text        not null default '',       -- imagem de capa opcional
-  unit         text        not null default '',       -- unidade responsável
-  created_at   timestamptz not null default now(),
-  updated_at   timestamptz not null default now()
+CREATE TABLE public.reports (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  type text NOT NULL CHECK (type = ANY (ARRAY['daily'::text, 'weekly'::text, 'monthly'::text])),
+  period_start date NOT NULL,
+  period_end date NOT NULL,
+  total_schedules integer NOT NULL DEFAULT 0,
+  total_completed integer NOT NULL DEFAULT 0,
+  total_pending integer NOT NULL DEFAULT 0,
+  total_cancelled integer NOT NULL DEFAULT 0,
+  generated_by text NOT NULL DEFAULT ''::text,
+  generated_by_id uuid,
+  generated_at timestamp with time zone NOT NULL DEFAULT now(),
+  summary jsonb NOT NULL DEFAULT '{}'::jsonb,
+  CONSTRAINT reports_pkey PRIMARY KEY (id),
+  CONSTRAINT reports_generated_by_id_fkey FOREIGN KEY (generated_by_id) REFERENCES public.users(id)
 );
-
-create index if not exists idx_projects_created    on public.projects (created_at desc);
-create index if not exists idx_projects_type       on public.projects (type);
-create index if not exists idx_projects_status     on public.projects (status);
-create index if not exists idx_projects_unit       on public.projects (unit);
-create index if not exists idx_projects_title_trgm on public.projects using gin (title gin_trgm_ops);
-
-create trigger tr_projects_updated_at before update on public.projects
-  for each row execute procedure public.set_updated_at();
-
--- ================================================================
--- 8. ALUNOS
--- Vinculados a um projeto (project_id) — antes era implícito no módulo Gifted.
--- Um aluno pode pertencer a um projeto específico ou ser geral (project_id = null).
--- ================================================================
-create table if not exists public.students (
-  id                  uuid        primary key default gen_random_uuid(),
-  name                text        not null,
-  birth_date          date,
-  grade               text        not null default '',
-  school              text        not null default '',
-  status              text        not null default 'identificado'
-                        check (status in ('identificado','em_avaliacao','monitoramento','concluido')),
-  responsible_name    text        not null default '',
-  responsible_contact text        not null default '',
-  primary_areas       text[]      not null default '{}',
-  notes               text        not null default '',
-  identified_at       date        not null default current_date,
-  identified_by       text        not null default '',
-  -- NOVO: vínculo com projeto
-  project_id          uuid        references public.projects on delete set null,
-  unit                text        not null default '',
-  created_at          timestamptz not null default now(),
-  updated_at          timestamptz not null default now()
+CREATE TABLE public.material_usage (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  item_id uuid,
+  item_name text NOT NULL,
+  category text NOT NULL DEFAULT ''::text,
+  total_used integer NOT NULL DEFAULT 0,
+  times_used integer NOT NULL DEFAULT 0,
+  last_used timestamp with time zone,
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT material_usage_pkey PRIMARY KEY (id)
 );
-
-create index if not exists idx_students_status     on public.students (status);
-create index if not exists idx_students_project    on public.students (project_id);
-create index if not exists idx_students_unit       on public.students (unit);
-create index if not exists idx_students_name_trgm  on public.students using gin (name gin_trgm_ops);
-
-create trigger tr_students_updated_at before update on public.students
-  for each row execute procedure public.set_updated_at();
-
--- ── Notas dos alunos ─────────────────────────────────────────
-create table if not exists public.gifted_grades (
-  id          uuid        primary key default gen_random_uuid(),
-  student_id  uuid        not null references public.students on delete cascade,
-  subject     text        not null,
-  grade       numeric(5,2)not null check (grade >= 0 and grade <= 10),
-  period      text        not null default '',
-  date        date        not null default current_date,
-  notes       text        not null default '',
-  created_at  timestamptz not null default now()
+CREATE TABLE public.students (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  birth_date date,
+  grade text NOT NULL DEFAULT ''::text,
+  school text NOT NULL DEFAULT ''::text,
+  status text NOT NULL DEFAULT 'identificado'::text CHECK (status = ANY (ARRAY['identificado'::text, 'em_avaliacao'::text, 'monitoramento'::text, 'concluido'::text])),
+  responsible_name text NOT NULL DEFAULT ''::text,
+  responsible_contact text NOT NULL DEFAULT ''::text,
+  primary_areas ARRAY NOT NULL DEFAULT '{}'::text[],
+  notes text NOT NULL DEFAULT ''::text,
+  identified_at date,
+  identified_by text NOT NULL DEFAULT ''::text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  project_id uuid,
+  CONSTRAINT students_pkey PRIMARY KEY (id),
+  CONSTRAINT students_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id)
 );
-create index if not exists idx_grades_student on public.gifted_grades (student_id);
-
--- ── Habilidades dos alunos ───────────────────────────────────
-create table if not exists public.gifted_skills (
-  id          uuid        primary key default gen_random_uuid(),
-  student_id  uuid        not null references public.students on delete cascade,
-  area        text        not null,
-  score       integer     not null default 0 check (score between 0 and 10),
-  assessed_by text        not null default '',
-  date        date        not null default current_date,
-  created_at  timestamptz not null default now()
+CREATE TABLE public.gifted_grades (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL,
+  subject text NOT NULL,
+  grade numeric NOT NULL CHECK (grade >= 0::numeric AND grade <= 10::numeric),
+  period text NOT NULL DEFAULT ''::text,
+  date date,
+  notes text NOT NULL DEFAULT ''::text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT gifted_grades_pkey PRIMARY KEY (id),
+  CONSTRAINT gifted_grades_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
 );
-create index if not exists idx_skills_student on public.gifted_skills (student_id);
-
--- ── Desenvolvimentos ─────────────────────────────────────────
-create table if not exists public.gifted_developments (
-  id          uuid        primary key default gen_random_uuid(),
-  student_id  uuid        not null references public.students on delete cascade,
-  date        date        not null default current_date,
-  title       text        not null,
-  description text        not null default '',
-  category    text        not null default '',
-  author      text        not null default '',
-  created_at  timestamptz not null default now()
+CREATE TABLE public.gifted_skills (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL,
+  area text NOT NULL,
+  score integer NOT NULL DEFAULT 0 CHECK (score >= 0 AND score <= 100),
+  assessed_by text NOT NULL DEFAULT ''::text,
+  date date,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT gifted_skills_pkey PRIMARY KEY (id),
+  CONSTRAINT gifted_skills_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
 );
-create index if not exists idx_dev_student on public.gifted_developments (student_id);
-
--- ── Conquistas ───────────────────────────────────────────────
-create table if not exists public.gifted_achievements (
-  id          uuid        primary key default gen_random_uuid(),
-  student_id  uuid        not null references public.students on delete cascade,
-  title       text        not null,
-  description text        not null default '',
-  date        date        not null default current_date,
-  type        text        not null default 'outro'
-                check (type in ('olimpiada','projeto','reconhecimento','publicacao','outro')),
-  created_at  timestamptz not null default now()
+CREATE TABLE public.gifted_developments (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL,
+  date date,
+  title text NOT NULL,
+  description text NOT NULL DEFAULT ''::text,
+  category text NOT NULL DEFAULT 'academico'::text CHECK (category = ANY (ARRAY['academico'::text, 'social'::text, 'criativo'::text, 'comportamental'::text, 'atividade'::text])),
+  author text NOT NULL DEFAULT ''::text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT gifted_developments_pkey PRIMARY KEY (id),
+  CONSTRAINT gifted_developments_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
 );
-create index if not exists idx_ach_student on public.gifted_achievements (student_id);
-
--- ================================================================
--- 9. QUIZZES
--- Vinculados a um projeto via project_id
--- ================================================================
-create table if not exists public.quizzes (
-  id                uuid        primary key default gen_random_uuid(),
-  title             text        not null,
-  description       text        not null default '',
-  subject           text        not null default '',
-  time_limit        integer     not null default 30 check (time_limit > 0),
-  status            text        not null default 'draft' check (status in ('draft','published')),
-  questions         jsonb       not null default '[]',
-  assigned_students text[]      not null default '{}',
-  -- NOVO: vínculo com projeto
-  project_id        uuid        references public.projects on delete set null,
-  created_by        uuid        references public.users on delete set null,
-  created_at        timestamptz not null default now(),
-  updated_at        timestamptz not null default now()
+CREATE TABLE public.gifted_achievements (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL,
+  title text NOT NULL,
+  description text NOT NULL DEFAULT ''::text,
+  date date,
+  type text NOT NULL DEFAULT 'outro'::text CHECK (type = ANY (ARRAY['olimpiada'::text, 'projeto'::text, 'reconhecimento'::text, 'publicacao'::text, 'outro'::text])),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT gifted_achievements_pkey PRIMARY KEY (id),
+  CONSTRAINT gifted_achievements_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id)
 );
-
-create index if not exists idx_quizzes_status  on public.quizzes (status);
-create index if not exists idx_quizzes_project on public.quizzes (project_id);
-
-create trigger tr_quizzes_updated_at before update on public.quizzes
-  for each row execute procedure public.set_updated_at();
-
-create table if not exists public.quiz_results (
-  id           uuid        primary key default gen_random_uuid(),
-  quiz_id      uuid        not null references public.quizzes on delete cascade,
-  student_id   text        not null,
-  score        numeric     not null default 0,
-  max_score    numeric     not null default 0,
-  answers      jsonb       not null default '[]',
-  completed_at timestamptz not null default now(),
-  time_taken   integer     not null default 0
+CREATE TABLE public.quizzes (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  description text NOT NULL DEFAULT ''::text,
+  subject text NOT NULL DEFAULT ''::text,
+  time_limit integer NOT NULL DEFAULT 30 CHECK (time_limit > 0),
+  status text NOT NULL DEFAULT 'draft'::text CHECK (status = ANY (ARRAY['draft'::text, 'published'::text])),
+  questions jsonb NOT NULL DEFAULT '[]'::jsonb,
+  assigned_students ARRAY NOT NULL DEFAULT '{}'::text[],
+  created_by text NOT NULL DEFAULT ''::text,
+  created_by_id uuid,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT quizzes_pkey PRIMARY KEY (id),
+  CONSTRAINT quizzes_created_by_id_fkey FOREIGN KEY (created_by_id) REFERENCES public.users(id)
 );
-
-create index if not exists idx_quiz_results_quiz    on public.quiz_results (quiz_id);
-create index if not exists idx_quiz_results_student on public.quiz_results (student_id);
-
--- ================================================================
--- 10. PROPOSTAS DE TRABALHO
--- ================================================================
-create table if not exists public.work_proposals (
-  id               uuid        primary key default gen_random_uuid(),
-  student_id       text        not null,
-  title            text        not null,
-  description      text        not null default '',
-  objectives       text        not null default '',
-  methodology      text        not null default '',
-  expected_results text        not null default '',
-  timeline         text        not null default '',
-  status           text        not null default 'submitted'
-                     check (status in ('submitted','under_review','approved','in_progress','completed')),
-  feedback         text        not null default '',
-  project_id       uuid        references public.projects on delete set null,
-  created_at       timestamptz not null default now(),
-  updated_at       timestamptz not null default now()
+CREATE TABLE public.quiz_results (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  quiz_id uuid NOT NULL,
+  student_id text NOT NULL,
+  student_uuid uuid,
+  score integer NOT NULL DEFAULT 0,
+  max_score integer NOT NULL DEFAULT 0,
+  answers jsonb NOT NULL DEFAULT '[]'::jsonb,
+  completed_at timestamp with time zone NOT NULL DEFAULT now(),
+  time_taken integer NOT NULL DEFAULT 0,
+  CONSTRAINT quiz_results_pkey PRIMARY KEY (id),
+  CONSTRAINT quiz_results_quiz_id_fkey FOREIGN KEY (quiz_id) REFERENCES public.quizzes(id),
+  CONSTRAINT quiz_results_student_uuid_fkey FOREIGN KEY (student_uuid) REFERENCES public.students(id)
 );
-
-create index if not exists idx_proposals_student on public.work_proposals (student_id);
-create index if not exists idx_proposals_status  on public.work_proposals (status);
-create index if not exists idx_proposals_project on public.work_proposals (project_id);
-
-create trigger tr_proposals_updated_at before update on public.work_proposals
-  for each row execute procedure public.set_updated_at();
-
--- ================================================================
--- 11. BLOG
--- ================================================================
-create table if not exists public.blog_posts (
-  id          uuid        primary key default gen_random_uuid(),
-  title       text        not null,
-  slug        text        not null unique,
-  content     text        not null default '',
-  excerpt     text        not null default '',
-  cover_url   text        not null default '',
-  tags        text[]      not null default '{}',
-  author      text        not null default '',
-  author_id   uuid        references public.users on delete set null,
-  published   boolean     not null default false,
-  views       integer     not null default 0,
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
+CREATE TABLE public.work_proposals (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_id text NOT NULL,
+  student_uuid uuid,
+  title text NOT NULL,
+  description text NOT NULL DEFAULT ''::text,
+  objectives text NOT NULL DEFAULT ''::text,
+  methodology text NOT NULL DEFAULT ''::text,
+  expected_results text NOT NULL DEFAULT ''::text,
+  timeline text NOT NULL DEFAULT ''::text,
+  status text NOT NULL DEFAULT 'submitted'::text CHECK (status = ANY (ARRAY['submitted'::text, 'under_review'::text, 'approved'::text, 'in_progress'::text, 'completed'::text])),
+  feedback text NOT NULL DEFAULT ''::text,
+  reviewed_by uuid,
+  reviewed_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT work_proposals_pkey PRIMARY KEY (id),
+  CONSTRAINT work_proposals_student_uuid_fkey FOREIGN KEY (student_uuid) REFERENCES public.students(id),
+  CONSTRAINT work_proposals_reviewed_by_fkey FOREIGN KEY (reviewed_by) REFERENCES public.users(id)
 );
-
-create index if not exists idx_blog_published on public.blog_posts (published, created_at desc);
-create index if not exists idx_blog_slug      on public.blog_posts (slug);
-create index if not exists idx_blog_trgm      on public.blog_posts using gin (title gin_trgm_ops);
-
-create trigger tr_blog_updated_at before update on public.blog_posts
-  for each row execute procedure public.set_updated_at();
-
--- ================================================================
--- 12. RELATÓRIOS
--- ================================================================
-create table if not exists public.reports (
-  id              uuid        primary key default gen_random_uuid(),
-  type            text        not null check (type in ('daily','weekly','monthly')),
-  period_start    date        not null,
-  period_end      date        not null,
-  total_schedules integer     not null default 0,
-  total_completed integer     not null default 0,
-  total_pending   integer     not null default 0,
-  total_cancelled integer     not null default 0,
-  generated_by    text        not null default '',
-  unit            text        not null default '',
-  summary         jsonb       not null default '{}',
-  generated_at    timestamptz not null default now()
+CREATE TABLE public.access_requests (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  email text NOT NULL,
+  role text NOT NULL DEFAULT 'professor'::text,
+  unit text NOT NULL DEFAULT ''::text,
+  status text NOT NULL DEFAULT 'pending'::text CHECK (status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])),
+  notes text NOT NULL DEFAULT ''::text,
+  reviewed_by uuid,
+  reviewed_at timestamp with time zone,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT access_requests_pkey PRIMARY KEY (id),
+  CONSTRAINT access_requests_reviewed_by_fkey FOREIGN KEY (reviewed_by) REFERENCES public.users(id)
 );
-
-create table if not exists public.material_usage (
-  id          uuid        primary key default gen_random_uuid(),
-  item_name   text        not null,
-  category    text        not null default '',
-  total_used  integer     not null default 0,
-  times_used  integer     not null default 0,
-  last_used   timestamptz not null default now(),
-  unit        text        not null default ''
+CREATE TABLE public.inventory_items (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  category text NOT NULL,
+  subcategory text,
+  quantity integer NOT NULL DEFAULT 0,
+  total integer NOT NULL DEFAULT 0,
+  unit_measure text NOT NULL DEFAULT 'un'::text,
+  status text NOT NULL DEFAULT 'in'::text CHECK (status = ANY (ARRAY['in'::text, 'out'::text, 'low'::text, 'maintenance'::text])),
+  description text,
+  location text,
+  min_stock integer DEFAULT 5,
+  image_url text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT inventory_items_pkey PRIMARY KEY (id)
 );
-
--- ================================================================
--- ROW LEVEL SECURITY
--- ================================================================
-alter table public.fablab_units       enable row level security;
-alter table public.user_classes       enable row level security;
-alter table public.users              enable row level security;
-alter table public.inventory_items    enable row level security;
-alter table public.movements          enable row level security;
-alter table public.schedules          enable row level security;
-alter table public.schedule_materials enable row level security;
-alter table public.suggestions        enable row level security;
-alter table public.projects           enable row level security;
-alter table public.students           enable row level security;
-alter table public.gifted_grades      enable row level security;
-alter table public.gifted_skills      enable row level security;
-alter table public.gifted_developments enable row level security;
-alter table public.gifted_achievements enable row level security;
-alter table public.quizzes            enable row level security;
-alter table public.quiz_results       enable row level security;
-alter table public.work_proposals     enable row level security;
-alter table public.blog_posts         enable row level security;
-alter table public.reports            enable row level security;
-alter table public.material_usage     enable row level security;
-
--- ================================================================
--- POLICIES
--- ================================================================
-
--- fablab_units: todos lêem, admin gerencia
-create policy "units_select" on public.fablab_units for select to authenticated using (true);
-create policy "units_all"    on public.fablab_units for all    to authenticated using (public.is_admin()) with check (public.is_admin());
-
--- user_classes: todos lêem, admin gerencia
-create policy "classes_select" on public.user_classes for select to authenticated using (true);
-create policy "classes_all"    on public.user_classes for all    to authenticated using (public.is_admin()) with check (public.is_admin());
-
--- users: cada um vê o próprio; admin vê todos
-create policy "users_select_own"  on public.users for select to authenticated using (id = auth.uid() or public.is_admin_or_professor());
-create policy "users_update_own"  on public.users for update to authenticated using (id = auth.uid() or public.is_admin());
-create policy "users_insert"      on public.users for insert to authenticated with check (true);
-
--- inventory
-create policy "inv_select"   on public.inventory_items for select to authenticated using (true);
-create policy "inv_insert"   on public.inventory_items for insert to authenticated with check (public.is_admin_or_professor());
-create policy "inv_update"   on public.inventory_items for update to authenticated using (public.is_admin_or_professor());
-create policy "inv_delete"   on public.inventory_items for delete to authenticated using (public.is_admin());
-
-create policy "movements_select" on public.movements for select to authenticated using (true);
-create policy "movements_insert" on public.movements for insert to authenticated with check (public.is_admin_or_professor());
-create policy "movements_delete" on public.movements for delete to authenticated using (public.is_admin());
-
--- schedules
-create policy "schedules_select" on public.schedules for select to authenticated using (true);
-create policy "schedules_insert" on public.schedules for insert to authenticated with check (public.is_admin_or_professor());
-create policy "schedules_update" on public.schedules for update to authenticated using (public.is_admin_or_professor());
-create policy "schedules_delete" on public.schedules for delete to authenticated using (public.is_admin());
-
-create policy "sched_mat_select" on public.schedule_materials for select to authenticated using (true);
-create policy "sched_mat_insert" on public.schedule_materials for insert to authenticated with check (public.is_admin_or_professor());
-create policy "sched_mat_delete" on public.schedule_materials for delete to authenticated using (public.is_admin());
-
--- suggestions: qualquer autenticado lê e cria; dono ou admin edita/deleta
-create policy "suggestions_select" on public.suggestions for select to authenticated using (true);
-create policy "suggestions_insert" on public.suggestions for insert to authenticated with check (auth.uid() is not null);
-create policy "suggestions_update" on public.suggestions for update to authenticated using (author_id = auth.uid() or public.is_admin());
-create policy "suggestions_delete" on public.suggestions for delete to authenticated using (author_id = auth.uid() or public.is_admin());
-
--- projects
-create policy "projects_select" on public.projects for select to authenticated using (true);
-create policy "projects_insert" on public.projects for insert to authenticated with check (auth.uid() is not null);
-create policy "projects_update" on public.projects for update to authenticated using (author_id = auth.uid() or public.is_admin_or_professor());
-create policy "projects_delete" on public.projects for delete to authenticated using (author_id = auth.uid() or public.is_admin());
-
--- students / gifted tables
-create policy "students_select" on public.students for select to authenticated using (true);
-create policy "students_insert" on public.students for insert to authenticated with check (public.is_admin_or_professor());
-create policy "students_update" on public.students for update to authenticated using (public.is_admin_or_professor());
-create policy "students_delete" on public.students for delete to authenticated using (public.is_admin());
-
-create policy "grades_select" on public.gifted_grades for select to authenticated using (true);
-create policy "grades_all"    on public.gifted_grades for all    to authenticated using (public.is_admin_or_professor()) with check (public.is_admin_or_professor());
-
-create policy "skills_select" on public.gifted_skills for select to authenticated using (true);
-create policy "skills_all"    on public.gifted_skills for all    to authenticated using (public.is_admin_or_professor()) with check (public.is_admin_or_professor());
-
-create policy "dev_select" on public.gifted_developments for select to authenticated using (true);
-create policy "dev_all"    on public.gifted_developments for all    to authenticated using (public.is_admin_or_professor()) with check (public.is_admin_or_professor());
-
-create policy "ach_select" on public.gifted_achievements for select to authenticated using (true);
-create policy "ach_all"    on public.gifted_achievements for all    to authenticated using (public.is_admin_or_professor()) with check (public.is_admin_or_professor());
-
--- quizzes
-create policy "quizzes_select" on public.quizzes for select to authenticated using (true);
-create policy "quizzes_insert" on public.quizzes for insert to authenticated with check (public.is_admin_or_professor());
-create policy "quizzes_update" on public.quizzes for update to authenticated using (public.is_admin_or_professor());
-create policy "quizzes_delete" on public.quizzes for delete to authenticated using (public.is_admin());
-
-create policy "qresults_select" on public.quiz_results for select to authenticated using (true);
-create policy "qresults_insert" on public.quiz_results for insert to authenticated with check (auth.uid() is not null);
-create policy "qresults_delete" on public.quiz_results for delete to authenticated using (public.is_admin());
-
--- proposals
-create policy "proposals_select" on public.work_proposals for select to authenticated
-  using (student_id = auth.uid()::text or public.is_admin_or_professor());
-create policy "proposals_insert" on public.work_proposals for insert to authenticated with check (auth.uid() is not null);
-create policy "proposals_update" on public.work_proposals for update to authenticated
-  using (student_id = auth.uid()::text or public.is_admin_or_professor());
-create policy "proposals_delete" on public.work_proposals for delete to authenticated using (public.is_admin());
-
--- blog
-create policy "blog_anon_read" on public.blog_posts for select to anon using (published = true);
-create policy "blog_select"    on public.blog_posts for select to authenticated using (true);
-create policy "blog_insert"    on public.blog_posts for insert to authenticated with check (public.is_admin_or_professor());
-create policy "blog_update"    on public.blog_posts for update to authenticated using (author_id = auth.uid() or public.is_admin());
-create policy "blog_delete"    on public.blog_posts for delete to authenticated using (public.is_admin());
-
--- reports
-create policy "reports_select" on public.reports for select to authenticated using (public.is_admin_or_professor());
-create policy "reports_insert" on public.reports for insert to authenticated with check (public.is_admin_or_professor());
-
-create policy "matusage_select" on public.material_usage for select to authenticated using (true);
-create policy "matusage_all"    on public.material_usage for all    to authenticated using (public.is_admin_or_professor()) with check (public.is_admin_or_professor());
-
--- ================================================================
--- VIEWS
--- ================================================================
-create or replace view public.v_schedule_summary as
-select status, count(*) as total,
-  count(*) filter (where date = current_date) as today
-from public.schedules group by status;
-
-create or replace view public.v_inventory_critical as
-select id, name, category, quantity, total, unit_measure, location, unit,
-  round(case when total>0 then quantity::numeric/total*100 else 0 end,1) as pct
-from public.inventory_items where total>0 and quantity::numeric/total < 0.3
-order by pct;
-
-create or replace view public.v_student_grade_avg as
-select s.id, s.name, s.grade as class, s.status, s.project_id,
-  round(coalesce(avg(g.grade),0),2) as avg_grade, count(g.id) as grade_count
-from public.students s left join public.gifted_grades g on g.student_id=s.id
-group by s.id,s.name,s.grade,s.status,s.project_id order by avg_grade desc;
-
-create or replace view public.v_project_stats as
-select p.id, p.title, p.type, p.status,
-  count(distinct s.id) as student_count,
-  count(distinct q.id) as quiz_count
-from public.projects p
-left join public.students s on s.project_id = p.id
-left join public.quizzes q on q.project_id = p.id
-group by p.id, p.title, p.type, p.status;
-
--- ================================================================
--- DADOS INICIAIS — Unidades padrão
--- ================================================================
-insert into public.fablab_units (name, city, state) values
-  ('FabLab Central', '', 'SP'),
-  ('FabLab Norte',   '', 'SP'),
-  ('FabLab Sul',     '', 'SP')
-on conflict (name) do nothing;
-
--- ================================================================
--- DADOS INICIAIS — Classes de usuário padrão
--- Rotas atualizadas para o novo módulo /projects/* (ex-/gifted/*)
--- ================================================================
-insert into public.user_classes (name, base_role, color, permissions) values
-('Administrador','admin','#DC2626','[
-  {"route":"/fablab/home",          "label":"FabLab · Início",         "allowed":true},
-  {"route":"/fablab/dashboard",     "label":"FabLab · Dashboard",      "allowed":true},
-  {"route":"/fablab/inventory",     "label":"FabLab · Inventário",     "allowed":true},
-  {"route":"/fablab/schedule",      "label":"FabLab · Agendamentos",   "allowed":true},
-  {"route":"/fablab/suggestions",   "label":"FabLab · Sugestões",      "allowed":true},
-  {"route":"/fablab/blog",          "label":"FabLab · Blog",           "allowed":true},
-  {"route":"/fablab/reports",       "label":"FabLab · Relatórios",     "allowed":true},
-  {"route":"/fablab/users",         "label":"FabLab · Usuários",       "allowed":true},
-  {"route":"/projects/home",        "label":"Projetos · Início",       "allowed":true},
-  {"route":"/projects/dashboard",   "label":"Projetos · Dashboard",    "allowed":true},
-  {"route":"/projects/students",    "label":"Projetos · Alunos",       "allowed":true},
-  {"route":"/projects/quiz-creator","label":"Projetos · Quiz",         "allowed":true},
-  {"route":"/projects/manage",      "label":"Projetos · Gerenciar",    "allowed":true},
-  {"route":"/student/quiz",         "label":"Aluno · Quiz",            "allowed":false},
-  {"route":"/student/grades",       "label":"Aluno · Notas",           "allowed":false},
-  {"route":"/student/proposal",     "label":"Aluno · Proposta",        "allowed":false}
-]'::jsonb),
-('Professor','professor','#1D4ED8','[
-  {"route":"/fablab/home",          "label":"FabLab · Início",         "allowed":true},
-  {"route":"/fablab/dashboard",     "label":"FabLab · Dashboard",      "allowed":false},
-  {"route":"/fablab/inventory",     "label":"FabLab · Inventário",     "allowed":true},
-  {"route":"/fablab/schedule",      "label":"FabLab · Agendamentos",   "allowed":true},
-  {"route":"/fablab/suggestions",   "label":"FabLab · Sugestões",      "allowed":true},
-  {"route":"/fablab/blog",          "label":"FabLab · Blog",           "allowed":true},
-  {"route":"/fablab/reports",       "label":"FabLab · Relatórios",     "allowed":true},
-  {"route":"/fablab/users",         "label":"FabLab · Usuários",       "allowed":false},
-  {"route":"/projects/home",        "label":"Projetos · Início",       "allowed":true},
-  {"route":"/projects/dashboard",   "label":"Projetos · Dashboard",    "allowed":true},
-  {"route":"/projects/students",    "label":"Projetos · Alunos",       "allowed":true},
-  {"route":"/projects/quiz-creator","label":"Projetos · Quiz",         "allowed":true},
-  {"route":"/projects/manage",      "label":"Projetos · Gerenciar",    "allowed":true},
-  {"route":"/student/quiz",         "label":"Aluno · Quiz",            "allowed":false},
-  {"route":"/student/grades",       "label":"Aluno · Notas",           "allowed":false},
-  {"route":"/student/proposal",     "label":"Aluno · Proposta",        "allowed":false}
-]'::jsonb),
-('Funcionário','funcionario','#059669','[
-  {"route":"/fablab/home",          "label":"FabLab · Início",         "allowed":true},
-  {"route":"/fablab/dashboard",     "label":"FabLab · Dashboard",      "allowed":false},
-  {"route":"/fablab/inventory",     "label":"FabLab · Inventário",     "allowed":true},
-  {"route":"/fablab/schedule",      "label":"FabLab · Agendamentos",   "allowed":true},
-  {"route":"/fablab/suggestions",   "label":"FabLab · Sugestões",      "allowed":false},
-  {"route":"/fablab/blog",          "label":"FabLab · Blog",           "allowed":true},
-  {"route":"/fablab/reports",       "label":"FabLab · Relatórios",     "allowed":false},
-  {"route":"/fablab/users",         "label":"FabLab · Usuários",       "allowed":false},
-  {"route":"/projects/home",        "label":"Projetos · Início",       "allowed":false},
-  {"route":"/projects/dashboard",   "label":"Projetos · Dashboard",    "allowed":false},
-  {"route":"/projects/students",    "label":"Projetos · Alunos",       "allowed":false},
-  {"route":"/projects/quiz-creator","label":"Projetos · Quiz",         "allowed":false},
-  {"route":"/projects/manage",      "label":"Projetos · Gerenciar",    "allowed":false},
-  {"route":"/student/quiz",         "label":"Aluno · Quiz",            "allowed":false},
-  {"route":"/student/grades",       "label":"Aluno · Notas",           "allowed":false},
-  {"route":"/student/proposal",     "label":"Aluno · Proposta",        "allowed":false}
-]'::jsonb),
-('Aluno','student','#7c3aed','[
-  {"route":"/fablab/home",          "label":"FabLab · Início",         "allowed":false},
-  {"route":"/fablab/dashboard",     "label":"FabLab · Dashboard",      "allowed":false},
-  {"route":"/fablab/inventory",     "label":"FabLab · Inventário",     "allowed":false},
-  {"route":"/fablab/schedule",      "label":"FabLab · Agendamentos",   "allowed":false},
-  {"route":"/fablab/suggestions",   "label":"FabLab · Sugestões",      "allowed":false},
-  {"route":"/fablab/blog",          "label":"FabLab · Blog",           "allowed":true},
-  {"route":"/fablab/reports",       "label":"FabLab · Relatórios",     "allowed":false},
-  {"route":"/fablab/users",         "label":"FabLab · Usuários",       "allowed":false},
-  {"route":"/projects/home",        "label":"Projetos · Início",       "allowed":false},
-  {"route":"/projects/dashboard",   "label":"Projetos · Dashboard",    "allowed":false},
-  {"route":"/projects/students",    "label":"Projetos · Alunos",       "allowed":false},
-  {"route":"/projects/quiz-creator","label":"Projetos · Quiz",         "allowed":false},
-  {"route":"/projects/manage",      "label":"Projetos · Gerenciar",    "allowed":false},
-  {"route":"/student/quiz",         "label":"Aluno · Quiz",            "allowed":true},
-  {"route":"/student/grades",       "label":"Aluno · Notas",           "allowed":true},
-  {"route":"/student/proposal",     "label":"Aluno · Proposta",        "allowed":true}
-]'::jsonb)
-on conflict do nothing;
-
--- ================================================================
--- RESET (dev only — descomente para limpar tudo e recriar)
--- ================================================================
-/*
-drop view  if exists public.v_project_stats, public.v_student_grade_avg,
-  public.v_inventory_critical, public.v_schedule_summary cascade;
-drop table if exists
-  public.work_proposals, public.quiz_results, public.quizzes,
-  public.gifted_achievements, public.gifted_developments, public.gifted_skills,
-  public.gifted_grades, public.students, public.material_usage, public.reports,
-  public.blog_posts, public.projects, public.suggestions,
-  public.schedule_materials, public.schedules, public.movements,
-  public.inventory_items, public.users, public.user_classes,
-  public.fablab_units cascade;
-drop function if exists public.handle_new_user, public.set_updated_at,
-  public.current_user_role, public.is_admin, public.is_admin_or_professor cascade;
-*/
-
-select 'FabLab Platform Schema v2026.1 aplicado com sucesso! 🚀' as resultado;
+CREATE TABLE public.fablabs (
+  id bigint NOT NULL DEFAULT nextval('fablabs_id_seq'::regclass),
+  name character varying NOT NULL,
+  slug character varying UNIQUE,
+  address text NOT NULL,
+  city character varying NOT NULL,
+  state_province character varying,
+  country character varying NOT NULL,
+  postal_code character varying,
+  latitude numeric NOT NULL,
+  longitude numeric NOT NULL,
+  description text,
+  image_url text,
+  website_url text,
+  email character varying,
+  phone character varying,
+  is_seed boolean DEFAULT false,
+  is_approved boolean DEFAULT false,
+  submitted_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT fablabs_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.fablab_files (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  description text DEFAULT ''::text,
+  category text NOT NULL DEFAULT 'outro'::text CHECK (category = ANY (ARRAY['stl'::text, 'gcode'::text, 'svg'::text, 'dxf'::text, '3mf'::text, 'glb'::text, 'image'::text, 'outro'::text])),
+  tags ARRAY DEFAULT '{}'::text[],
+  gallery ARRAY DEFAULT '{}'::text[],
+  file_name text NOT NULL DEFAULT ''::text,
+  file_url text NOT NULL DEFAULT ''::text,
+  storage_path text NOT NULL DEFAULT ''::text,
+  size_bytes bigint DEFAULT 0,
+  compressed boolean DEFAULT false,
+  published boolean DEFAULT false,
+  uploaded_by text NOT NULL DEFAULT ''::text,
+  author_role text DEFAULT ''::text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  project_id uuid,
+  CONSTRAINT fablab_files_pkey PRIMARY KEY (id),
+  CONSTRAINT fablab_files_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id)
+);
+CREATE TABLE public.machines (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  type text NOT NULL DEFAULT ''::text,
+  location text NOT NULL DEFAULT ''::text,
+  status text NOT NULL DEFAULT 'operacional'::text CHECK (status = ANY (ARRAY['operacional'::text, 'manutencao'::text, 'limpeza'::text, 'aguardando_peca'::text, 'inativo'::text])),
+  brand text DEFAULT ''::text,
+  model text DEFAULT ''::text,
+  serial_number text DEFAULT ''::text,
+  acquired_at date,
+  last_maintenance date,
+  notes text DEFAULT ''::text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  category text NOT NULL DEFAULT 'Outro'::text,
+  scheduled_events jsonb NOT NULL DEFAULT '[]'::jsonb,
+  CONSTRAINT machines_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.maintenance_tickets (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  machine_id uuid,
+  machine_name text NOT NULL,
+  machine_location text DEFAULT ''::text,
+  problem text NOT NULL,
+  priority text NOT NULL DEFAULT 'media'::text CHECK (priority = ANY (ARRAY['baixa'::text, 'media'::text, 'alta'::text, 'critica'::text])),
+  status text NOT NULL DEFAULT 'aberto'::text CHECK (status = ANY (ARRAY['aberto'::text, 'em_andamento'::text, 'aguardando_peca'::text, 'resolvido'::text])),
+  reported_by text NOT NULL,
+  assigned_to text DEFAULT ''::text,
+  opened_at timestamp with time zone NOT NULL DEFAULT now(),
+  resolved_at timestamp with time zone,
+  logs jsonb NOT NULL DEFAULT '[]'::jsonb,
+  inventory_item_id uuid,
+  CONSTRAINT maintenance_tickets_pkey PRIMARY KEY (id),
+  CONSTRAINT maintenance_tickets_machine_id_fkey FOREIGN KEY (machine_id) REFERENCES public.machines(id),
+  CONSTRAINT maintenance_tickets_inventory_item_id_fkey FOREIGN KEY (inventory_item_id) REFERENCES public.inventory_items(id)
+);
+CREATE TABLE public.attendance (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  student_id uuid NOT NULL,
+  project_id uuid,
+  date date NOT NULL DEFAULT CURRENT_DATE,
+  status text NOT NULL DEFAULT 'presente'::text CHECK (status = ANY (ARRAY['presente'::text, 'falta'::text, 'justificada'::text])),
+  notes text NOT NULL DEFAULT ''::text,
+  registered_by text NOT NULL DEFAULT ''::text,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT attendance_pkey PRIMARY KEY (id),
+  CONSTRAINT attendance_student_id_fkey FOREIGN KEY (student_id) REFERENCES public.students(id),
+  CONSTRAINT attendance_project_id_fkey FOREIGN KEY (project_id) REFERENCES public.projects(id)
+);
