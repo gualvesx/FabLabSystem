@@ -18,8 +18,10 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Edit2, Trash2, MoreVertical, Shield, Settings,
-         Upload, Users, UserCheck, AlertCircle, CheckCircle2 } from 'lucide-react';
+import {
+  Plus, Edit2, Trash2, MoreVertical, Shield, Settings,
+  Upload, Users, UserCheck, AlertCircle, CheckCircle2
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +34,7 @@ import { PageTransition } from '@/components/layout/PageTransition';
 import { ROLE_LABELS, ALL_ROUTES, CLASS_COLORS } from '@/lib/constants';
 import { supabase } from '@/lib/supabase';
 import { useClassStore } from '@/stores/classStore';
+import { useAccessRequestStore } from '@/stores/accessRequestStore';
 import type { User, UserClass, RoutePermission } from '@/types';
 
 const EMPTY_USER = { name: '', email: '', role: 'professor', unit: '', class_id: '' };
@@ -54,8 +57,8 @@ function PermissionEditor({ perms, onChange }: { perms: RoutePermission[]; onCha
     <div className="space-y-3">
       {modules.map(mod => {
         const modRoutes = ALL_ROUTES.filter(r => r.module === mod);
-        const modPerms  = perms.filter(p => modRoutes.some(r => r.route === p.route));
-        const allOn  = modPerms.every(p => p.allowed);
+        const modPerms = perms.filter(p => modRoutes.some(r => r.route === p.route));
+        const allOn = modPerms.every(p => p.allowed);
         const allOff = modPerms.every(p => !p.allowed);
         return (
           <div key={mod} className="border border-border rounded-xl overflow-hidden">
@@ -88,7 +91,7 @@ function PermissionEditor({ perms, onChange }: { perms: RoutePermission[]; onCha
 function ClassCard({ cls, onEdit, onDelete }: { cls: UserClass; onEdit: () => void; onDelete: () => void }) {
   const { t } = useTranslation();
   const allowed = cls.permissions.filter(p => p.allowed).length;
-  const total   = cls.permissions.length;
+  const total = cls.permissions.length;
   return (
     <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-3 hover:shadow-sm transition-shadow">
       <div className="flex items-center gap-3">
@@ -121,7 +124,7 @@ function ClassCard({ cls, onEdit, onDelete }: { cls: UserClass; onEdit: () => vo
 
 // ── Hook para parsing CSV ────────────────────────────────────
 function parseCSV(text: string): Record<string, string>[] {
-  const lines  = text.trim().split('\n').filter(Boolean);
+  const lines = text.trim().split('\n').filter(Boolean);
   if (lines.length < 2) return [];
   const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
   return lines.slice(1).map(line => {
@@ -133,34 +136,35 @@ function parseCSV(text: string): Record<string, string>[] {
 export function FabUsers() {
   const { t } = useTranslation();
   const { classes, fetchClasses } = useClassStore();
-  const [users, setUsers]           = useState<User[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [search, setSearch]         = useState('');
+  const { requests, loading: reqLoading, fetchRequests, approveRequest, rejectRequest } = useAccessRequestStore();
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
 
   // Modais usuário
-  const [userModal, setUserModal]   = useState(false);
-  const [editUser, setEditUser]     = useState<User | null>(null);
-  const [userForm, setUserForm]     = useState(EMPTY_USER);
-  const [saving, setSaving]         = useState(false);
+  const [userModal, setUserModal] = useState(false);
+  const [editUser, setEditUser] = useState<User | null>(null);
+  const [userForm, setUserForm] = useState(EMPTY_USER);
+  const [saving, setSaving] = useState(false);
 
   // Modais classe
-  const [classModal, setClassModal]   = useState(false);
-  const [editClass, setEditClass]     = useState<UserClass | null>(null);
+  const [classModal, setClassModal] = useState(false);
+  const [editClass, setEditClass] = useState<UserClass | null>(null);
   const [deleteClass, setDeleteClass] = useState<UserClass | null>(null);
-  const [classForm, setClassForm]     = useState({ name: '', base_role: 'professor', color: CLASS_COLORS[0] });
-  const [classPerms, setClassPerms]   = useState<RoutePermission[]>([]);
+  const [classForm, setClassForm] = useState({ name: '', base_role: 'professor', color: CLASS_COLORS[0] });
+  const [classPerms, setClassPerms] = useState<RoutePermission[]>([]);
 
   // CSV import
-  const [csvModal, setCsvModal]       = useState(false);
-  const [csvType, setCsvType]         = useState<'users' | 'students'>('users');
-  const [csvPreview, setCsvPreview]   = useState<Record<string, string>[]>([]);
-  const [csvError, setCsvError]       = useState('');
-  const [csvSuccess, setCsvSuccess]   = useState('');
+  const [csvModal, setCsvModal] = useState(false);
+  const [csvType, setCsvType] = useState<'users' | 'students'>('users');
+  const [csvPreview, setCsvPreview] = useState<Record<string, string>[]>([]);
+  const [csvError, setCsvError] = useState('');
+  const [csvSuccess, setCsvSuccess] = useState('');
   const [csvImporting, setCsvImporting] = useState(false);
   const csvRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { fetchUsers(); fetchClasses(); }, []);
+  useEffect(() => { fetchUsers(); fetchClasses(); fetchRequests(); }, []);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -170,7 +174,7 @@ export function FabUsers() {
   };
 
   // ── Usuários CRUD ────────────────────────────────────────
-  const openAddUser  = () => { setEditUser(null); setUserForm(EMPTY_USER); setUserModal(true); };
+  const openAddUser = () => { setEditUser(null); setUserForm(EMPTY_USER); setUserModal(true); };
   const openEditUser = (u: User) => { setEditUser(u); setUserForm({ name: u.name, email: u.email, role: u.role, unit: u.unit, class_id: u.class_id || '' }); setUserModal(true); };
 
   const handleSaveUser = async () => {
@@ -289,7 +293,7 @@ export function FabUsers() {
   // ── Filtragem ─────────────────────────────────────────────
   const filtered = users.filter(u => {
     const matchSearch = u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
-    const matchRole   = roleFilter === 'all' || u.role === roleFilter;
+    const matchRole = roleFilter === 'all' || u.role === roleFilter;
     return matchSearch && matchRole;
   });
 
@@ -305,8 +309,44 @@ export function FabUsers() {
             <TabsList>
               <TabsTrigger value="users" className="gap-2"><Users size={14} /> {t('sidebar.users')}</TabsTrigger>
               <TabsTrigger value="classes" className="gap-2"><Shield size={14} /> {t('fabUsers.classes')}</TabsTrigger>
+              <TabsTrigger value="requests" className="gap-2">
+                <UserCheck size={14} /> Solicitações
+                {requests.filter(r => r.status === 'pending').length > 0 && (
+                  <Badge variant="destructive" className="ml-1 h-4 px-1.5 text-[10px]">
+                    {requests.filter(r => r.status === 'pending').length}
+                  </Badge>
+                )}
+              </TabsTrigger>
             </TabsList>
           </div>
+
+          {/* ── ABA SOLICITAÇÕES ── */}
+          <TabsContent value="requests" className="space-y-3 mt-4">
+            {reqLoading ? (
+              <div className="flex items-center justify-center py-16 gap-2 text-muted-foreground">
+                <div className="w-5 h-5 border-2 border-border border-t-blue-500 rounded-full animate-spin" />{t('app.loading')}
+              </div>
+            ) : requests.filter(r => r.status === 'pending').length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground text-sm">Nenhuma solicitação pendente.</div>
+            ) : (
+              requests.filter(r => r.status === 'pending').map(r => (
+                <div key={r.id} className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-sm">{r.name}</div>
+                    <div className="text-xs text-muted-foreground">{r.email} · {ROLE_LABELS[r.role] || r.role} · {r.unit}</div>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <Button size="sm" variant="outline" className="text-destructive" onClick={() => rejectRequest(r.id)}>
+                      Rejeitar
+                    </Button>
+                    <Button size="sm" style={{ background: '#1D4ED8' }} className="text-white" onClick={() => approveRequest(r.id)}>
+                      Aprovar
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </TabsContent>
 
           {/* ── ABA USUÁRIOS ── */}
           <TabsContent value="users" className="space-y-4 mt-4">
@@ -514,9 +554,9 @@ export function FabUsers() {
             <div className="p-3 rounded-lg bg-muted/50 border border-border text-sm text-muted-foreground">
               <p className="font-semibold text-foreground mb-1">{t('fabUsers.expectedFormat')}</p>
               {csvType === 'students' ? (
-                <code className="text-xs block">name,email,unit<br/>João Silva,joao@email.com,FabLab Central</code>
+                <code className="text-xs block">name,email,unit<br />João Silva,joao@email.com,FabLab Central</code>
               ) : (
-                <code className="text-xs block">name,email,role,unit<br/>João Silva,joao@email.com,professor,FabLab Central</code>
+                <code className="text-xs block">name,email,role,unit<br />João Silva,joao@email.com,professor,FabLab Central</code>
               )}
               <p className="mt-2 text-xs">{t('fabUsers.validRoles')}: admin, professor, funcionario, student</p>
             </div>
@@ -548,7 +588,7 @@ export function FabUsers() {
               </div>
             )}
 
-            {csvError   && <div className="flex items-center gap-2 text-sm text-destructive"><AlertCircle size={14} />{csvError}</div>}
+            {csvError && <div className="flex items-center gap-2 text-sm text-destructive"><AlertCircle size={14} />{csvError}</div>}
             {csvSuccess && <div className="flex items-center gap-2 text-sm text-green-600"><CheckCircle2 size={14} />{csvSuccess}</div>}
           </div>
           <DialogFooter>

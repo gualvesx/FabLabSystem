@@ -4,6 +4,7 @@ import { Activity, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/stores/authStore';
+import { useScheduleStore } from '@/stores/scheduleStore';
 import { PageTransition } from '@/components/layout/PageTransition';
 import { supabase } from '@/lib/supabase';
 import type { MaterialUsage } from '@/types';
@@ -13,11 +14,14 @@ import { cn } from '@/lib/utils';
 export function FabReports() {
   const { t } = useTranslation();
   const { user } = useAuthStore();
+  const { schedules, fetchSchedules } = useScheduleStore();
   const [tab, setTab] = useState<'diario' | 'semanal' | 'mensal' | 'materiais'>('diario');
   const [reports, setReports] = useState<Report[]>([]);
   const [materialUsage, setMaterialUsage] = useState<MaterialUsage[]>([]);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
+    fetchSchedules();
     supabase.from('reports').select('*').order('generated_at', { ascending: false }).then(({ data }) => {
       if (data) setReports(data as Report[]);
     });
@@ -25,12 +29,53 @@ export function FabReports() {
       if (data) setMaterialUsage(data as MaterialUsage[]);
     });
   }, []);
+
   const [expanded, setExpanded] = useState<string | null>(null);
   const isAdmin = user?.role === 'admin';
 
   const pct = (a: number, b: number) => b > 0 ? Math.round(a / b * 100) : 0;
 
   const filtered = reports.filter((r) => r.type === (tab === 'diario' ? 'daily' : tab === 'semanal' ? 'weekly' : 'monthly'));
+
+  const periodBounds = (kind: 'daily' | 'weekly' | 'monthly') => {
+    const now = new Date();
+    const end = now.toISOString().split('T')[0];
+    const start = new Date(now);
+    if (kind === 'daily') { /* mesmo dia */ }
+    else if (kind === 'weekly') start.setDate(start.getDate() - 7);
+    else start.setMonth(start.getMonth() - 1);
+    return { start: start.toISOString().split('T')[0], end };
+  };
+
+  const handleGenerateReport = async (kind: 'daily' | 'weekly' | 'monthly') => {
+    setGenerating(true);
+    const { start, end } = periodBounds(kind);
+    const inRange = schedules.filter(s => s.date >= start && s.date <= end);
+    const total_completed = inRange.filter(s => s.status === 'concluido').length;
+    const total_pending = inRange.filter(s => s.status === 'pendente' || s.status === 'confirmado').length;
+    const total_cancelled = inRange.filter(s => s.status === 'cancelado').length;
+
+    const payload = {
+      type: kind,
+      period_start: start,
+      period_end: end,
+      total_schedules: inRange.length,
+      total_completed,
+      total_pending,
+      total_cancelled,
+      generated_by: user?.name || '',
+      generated_at: new Date().toISOString(),
+      summary: {
+        stats: { total: inRange.length, completed: total_completed, pending: total_pending, cancelled: total_cancelled },
+        top_materials: materialUsage.slice(0, 5).map(m => ({ item_name: m.item_name, total: m.total_used })),
+        schedules: inRange.map(s => ({ title: s.title, start_time: s.start_time, responsible: s.responsible, status: s.status })),
+      },
+    };
+
+    const { data } = await supabase.from('reports').insert(payload).select().single();
+    if (data) setReports(prev => [data as Report, ...prev]);
+    setGenerating(false);
+  };
 
   const StatCard = ({ label, value, color }: { label: string; value: number; color: string }) => (
     <div className="bg-card border border-border rounded-xl p-4 text-center">
@@ -60,7 +105,14 @@ export function FabReports() {
         <>
           {isAdmin && (
             <div className="bg-card border border-border rounded-xl p-4 mb-4 flex gap-3 items-end flex-wrap">
-              <Button size="sm" style={{ background: 'var(--fab-primary)' }}><Activity size={14} className="mr-1" /> Gerar relatório {tab}</Button>
+              <Button
+                size="sm"
+                disabled={generating}
+                onClick={() => handleGenerateReport(tab === 'diario' ? 'daily' : tab === 'semanal' ? 'weekly' : 'monthly')}
+                style={{ background: 'var(--fab-primary)' }}
+              >
+                <Activity size={14} className="mr-1" /> {generating ? t('app.loading') : `Gerar relatório ${tab}`}
+              </Button>
             </div>
           )}
           {filtered.length === 0 ? (

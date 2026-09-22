@@ -53,7 +53,7 @@ interface UnitInfo {
 // ---------------------------------------------------------------------------
 
 // Coordenadas de exemplo para FabLabs brasileiros
-const SAMPLE_POINTS = [
+/*const SAMPLE_POINTS = [
   { lat: -23.5505, lng: -46.6333, label: 'São Paulo' },
   { lat: -22.9068, lng: -43.1729, label: 'Rio de Janeiro' },
   { lat: -19.9167, lng: -43.9345, label: 'Belo Horizonte' },
@@ -66,8 +66,10 @@ const SAMPLE_POINTS = [
   { lat: -3.1190, lng: -60.0217, label: 'Manaus' },
   { lat: -25.4284, lng: -49.2733, label: 'Curitiba' },
 ];
+*/
+interface FabLabPoint { lat: number; lng: number; label: string; }
 
-function SatelliteMap() {
+function SatelliteMap({ points }: { points: FabLabPoint[] }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletRef = useRef<unknown>(null);
   const mapInstanceRef = useRef<unknown>(null);
@@ -141,7 +143,7 @@ function SatelliteMap() {
       });
 
       // Add markers
-      SAMPLE_POINTS.forEach(pt => {
+      points.forEach(pt => {
         Lmap.marker([pt.lat, pt.lng], { icon: markerIcon })
           .addTo(map)
           .bindPopup(`
@@ -192,7 +194,7 @@ function SatelliteMap() {
         mapInstanceRef.current = null;
       }
     };
-  }, []);
+  }, [points]);
 
   return (
     <div style={{ position: 'relative' }}>
@@ -381,59 +383,19 @@ export function PublicUnidades() {
   const [units, setUnits] = useState<UnitInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [labPoints, setLabPoints] = useState<FabLabPoint[]>([]);
 
-  useEffect(() => {
-    // Inject Leaflet popup styles to match dark theme
-    if (!document.getElementById('leaflet-dark-styles')) {
-      const style = document.createElement('style');
-      style.id = 'leaflet-dark-styles';
-      style.textContent = `
-        .fablab-popup .leaflet-popup-content-wrapper {
-          background: transparent !important;
-          box-shadow: none !important;
-          padding: 0 !important;
-          border-radius: 10px !important;
-          overflow: hidden;
-        }
-        .fablab-popup .leaflet-popup-content {
-          margin: 0 !important;
-        }
-        .fablab-popup .leaflet-popup-tip-container {
-          display: none !important;
-        }
-        .leaflet-control-zoom {
-          border: 1px solid rgba(255,255,255,0.1) !important;
-          border-radius: 10px !important;
-          overflow: hidden;
-          box-shadow: 0 4px 20px rgba(0,0,0,0.5) !important;
-        }
-        .leaflet-control-zoom a {
-          background: rgba(8,9,12,0.9) !important;
-          color: rgba(255,255,255,0.7) !important;
-          border-color: rgba(255,255,255,0.08) !important;
-          font-size: 18px !important;
-          line-height: 28px !important;
-          width: 30px !important;
-          height: 30px !important;
-        }
-        .leaflet-control-zoom a:hover {
-          background: rgba(29,78,216,0.4) !important;
-          color: #fff !important;
-        }
-        .leaflet-control-attribution {
-          background: rgba(8,9,12,0.7) !important;
-          color: rgba(255,255,255,0.25) !important;
-          font-size: 9px !important;
-          backdrop-filter: blur(8px);
-          border-radius: 6px 6px 0 0 !important;
-        }
-        .leaflet-control-attribution a {
-          color: rgba(255,255,255,0.35) !important;
-        }
-      `;
-      document.head.appendChild(style);
-    }
-  }, []);
+    useEffect(() => {
+      supabase
+        .from('fablabs')
+        .select('name, city, latitude, longitude')
+        .eq('is_approved', true)
+        .then(({ data }) => {
+          if (data) {
+            setLabPoints(data.map(f => ({ lat: Number(f.latitude), lng: Number(f.longitude), label: f.city || f.name })));
+          }
+        });
+    }, []);
 
   useEffect(() => {
     async function fetchUnits() {
@@ -565,7 +527,7 @@ export function PublicUnidades() {
           </div>
         </div>
 
-        <SatelliteMap />
+         {labPoints.length > 0 && <SatelliteMap points={labPoints} />}
       </motion.div>
 
       {/* Units grid */}
