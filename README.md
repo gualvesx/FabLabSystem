@@ -4,17 +4,16 @@
 
 # FabLabSystem · Gestão de Laboratórios
 
-**Sistema inteligente para gerenciamento de laboratórios de fabricação digital, agendamento de máquinas e controle de estoque**
+**Sistema web completo para gerenciamento de Fab Labs, agendamento de máquinas, controle de estoque e usuários**
 
 [![React](https://img.shields.io/badge/React-18-61dafb?style=flat-square&logo=react)](https://reactjs.org)
 [![Vite](https://img.shields.io/badge/Vite-5-646cff?style=flat-square&logo=vite)](https://vitejs.dev)
-[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ecf8e?style=flat-square&logo=supabase)](https://supabase.io)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38bdf8?style=flat-square&logo=tailwindcss)](https://tailwindcss.com)
-[![PWA](https://img.shields.io/badge/PWA-Ready-5a0fc8?style=flat-square)](https://web.dev/progressive-web-apps)
+[![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=flat-square&logo=nodedotjs)](https://nodejs.org)
+[![Render](https://img.shields.io/badge/Render-Deployed-46E3B7?style=flat-square&logo=render)](https://render.com)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 [![Open Source](https://img.shields.io/badge/Open%20Source-%E2%9D%A4-red?style=flat-square)](https://github.com/gualvesx/FabLabSystem)
 
-[**🌐 Demo ao vivo**](https://fablab.ynm.com.br) · [**📖 Documentação**](#-funcionalidades) · [**⭐ Deixe uma estrela**](https://github.com/gualvesx/FabLabSystem)
+[**🌐 Acesse a Aplicação**](https://fablabsystem-dcim.onrender.com/) · [**📖 Documentação**](#-funcionalidades) · [**⭐ Deixe uma estrela**](https://github.com/gualvesx/FabLabSystem)
 
 </div>
 
@@ -22,236 +21,136 @@
 
 ## ✨ O que é o FabLabSystem?
 
-FabLabSystem é uma plataforma **open source** desenvolvida para otimizar e automatizar a gestão operacional de **Fab Labs, Makerspaces e Laboratórios de Prototipagem**. O sistema centraliza o agendamento de máquinas de fabricação digital, o controle de insumos e matérias-primas, a habilitação de usuários (badges de segurança) e a documentação de projetos abertos da comunidade maker.
+**FabLabSystem** é um sistema web desenvolvido para simplificar a gestão operacional de **Fab Labs, Makerspaces e Laboratórios de Prototipagem**. A plataforma centraliza o cadastro e controle de status do parque fabril, o agendamento de uso de máquinas (impressoras 3D, cortadoras a laser, CNCs), o gerenciamento de insumos e o controle de acesso dos membros da comunidade.
 
-> *"Dê às pessoas as ferramentas para fabricar o que precisam e elas mudarão o mundo."*  
-> — Neil Gershenfeld, Criador do conceito Fab Lab (MIT)
+> *"Se você pode imaginar, você pode fabricar."*  
+> — Filosofia do Movimento Maker
 
 ---
 
 ## 🚀 Funcionalidades
 
 ### 🖨️ Equipamentos & Máquinas
-- **Cadastro completo de parque fabril**: impressoras 3D (FDM/SLA), cortadoras a laser, fresadoras CNC, plotters de corte e bancadas de eletrônica
-- **Status em tempo real**: Operacional, Em Uso, Em Manutenção ou Fora de Serviço
-- **Especificações e manuais**: vínculo de documentação técnica, parâmetros de corte/impressão e checklist de segurança por equipamento
-- **Histórico de manutenção**: registro preventivo e corretivo das máquinas com log de substituição de peças
+- **Cadastro de parque fabril**: controle de impressoras 3D, cortadoras a laser, fresadoras CNC e bancadas de eletrônica
+- **Status em tempo real**: indicação visual de equipamentos *Disponíveis*, *Em Uso*, *Em Manutenção* ou *Inativos*
+- **Especificações técnicas**: registro de manuais, parâmetros operacionais e recomendações de segurança
 
-### 📅 Agendamentos & Reservas
-- **Grade de horários inteligente**: visualização diária, semanal e mensal de ocupação do laboratório
-- **Regras de reserva flexíveis**: limite de horas por usuário/semana para prevenção de gargalos
-- **Validação de pré-requisitos**: sistema impede a reserva de máquinas complexas caso o usuário não possua a habilitação/treinamento exigido
-- **Check-in & Check-out**: confirmação de presença no início da sessão para liberação do equipamento
+### 📅 Agendamento & Reservas
+- **Grade de horários**: controle de uso de máquinas por data e faixa horária
+- **Evitação de conflitos**: validação automática de horários sobrepostos no mesmo equipamento
+- **Gestão de reservas**: confirmação, cancelamento e histórico de utilização por usuário
 
-### 📦 Controle de Estoque & Insumos
-- **Gestão de matérias-primas**: filamentos 3D (PLA, ABS, PETG, TPU), chapas de MDF, acrílicos, componentes eletrônicos e ferramentas
-- **Alertas de estoque baixo**: notificações automáticas quando um insumo atinge a quantidade mínima de segurança
-- **Baixa automática por projeto**: desconto de gramas de filamento ou área em $m^2$ consumidos durante as sessões
-- **Histórico de compras e fornecedores**: controle financeiro de entradas e saídas de material
+### 📦 Controle de Insumos & Estoque
+- **Gestão de materiais**: filamentos (PLA, ABS, PETG), chapas de MDF, acrílicos e componentes eletrônicos
+- **Entradas e saídas**: registro de movimentações de estoque por projeto ou manutenção
+- **Alerta de quantidade mínima**: monitoramento para reposição preventiva de insumos
 
-### 🎓 Habilitações & Treinamentos (Badges)
-- **Certificação de usuários**: controle de capacitações e treinamentos de segurança concluídos
-- **Emissão e validação de badges**: perfis exibem as habilidades e equipamentos autorizados
-- **Níveis de experiência**: categorização de makers (Iniciante, Operador, Monitor, Fab Manager)
-
-### 👥 Gestão de Makers & Comunidade
-- **Cadastro de membros e visitantes**: controle de acessos ao espaço e estatísticas de público
-- **Galeria de projetos open source**: portfólio de projetos desenvolvidos no laboratório com suporte a arquivos CAD, STL e esquemáticos
-- **Registro de presença**: controle diário de fluxo de pessoas no makerspace
+### 👥 Gestão de Usuários & Acessos
+- **Perfis e níveis de acesso**: separação entre Administradores, Gestores do Lab e Makers/Membros
+- **Histórico do usuário**: acompanhamento das reservas e projetos de cada membro
+- **Controle de permissões**: restrição de agendamento de máquinas conforme o nível do usuário
 
 ### 📊 Dashboard & Relatórios
-- **Métricas de utilização**: taxa de ocupação de máquinas, horas trabalhadas por equipamento e pico de horários
-- **Consumo de materiais**: relatórios detalhados de desperdício e consumo de insumos por período
-- **Exportação de relatórios**: relatórios em PDF, CSV e JSON para prestação de contas institucionais
-
-### ⚙️ Configurações & Acessos
-- **Controle de permissões (RBAC)**: perfis diferenciados para Administrador, Fab Manager, Monitor e Maker
-- **Tema escuro/claro**: interface moderna adaptável com persistência de preferência
-- **Notificações configuráveis**: e-mails e alertas sobre confirmação de reservas e lembretes de devolução de ferramentas
+- **Visão geral do espaço**: estatísticas rápidas de uso e ocupação do laboratório
+- **Gráficos e métricas**: relatórios de máquinas mais utilizadas e consumo de materiais
+- **Resumo operacional**: painel com próximos agendamentos e atividades do dia
 
 ---
 
-## 📱 PWA — Progressive Web App
+## 🌐 Hospedagem & Deploy
 
-FabLabSystem foi projetado como um **PWA de alta performance**, permitindo o uso fluido tanto no navegador desktop quanto instalado em tablets de bancada e smartphones.
+A aplicação está hospedada e em execução no **Render**:
 
-### Instalar no Desktop / Tablet de Bancada
-1. Acesse o sistema no navegador (Chrome, Edge ou Safari)
-2. Clique no ícone de instalação na barra de navegação
-3. Clique em **Instalar** para executar a aplicação como janela autônoma de quiosque
-
-### O que o PWA oferece
-| Recurso | Disponível |
-|---------|-----------|
-| Funciona offline (leitura e cache) | ✅ Service Worker |
-| Instalável na tela inicial | ✅ |
-| Notificações in-app e push | ✅ |
-| Interface responsiva para quiosques | ✅ |
-| Atualizações em tempo real | ✅ via Supabase Realtime |
+- **URL de Produção**: [https://fablabsystem-dcim.onrender.com/](https://fablabsystem-dcim.onrender.com/)
+- **Deploy Continuo**: integração automática via webhook no repositório GitHub a cada atualização no branch principal (`main`)
 
 ---
 
 ## 🏗️ Stack Tecnológica
 
-| Camada | Tecnologia | Versão |
-|--------|-----------|--------|
-| UI / Frontend | React | 18 |
-| Build Tool | Vite | 5 |
-| Linguagem | JavaScript (ES6+) | — |
-| Estilização | Tailwind CSS | 3.4 |
-| Ícones | Lucide React | — |
-| Backend & Auth | Supabase | — |
-| Banco de Dados | PostgreSQL (via Supabase) | — |
-| PWA | Service Worker + Web App Manifest | — |
-| CI/CD | GitHub Actions | — |
-| Hospedagem | Vercel / Netlify / Serverless | — |
+| Camada | Tecnologia | Descrição |
+|--------|-----------|-----------|
+| Frontend | React 18 | Biblioteca UI reativa e modular |
+| Build Tool | Vite 5 | Bundler de alto desempenho para desenvolvimento ágil |
+| Estilização | CSS Modules / Tailwind | Design responsivo e adaptado para telas desktop e mobile |
+| Roteamento | React Router | Navegação SPA de alta performance |
+| Backend / API | Node.js / Express | API RESTful para regras de negócio |
+| Banco de Dados | PostgreSQL / MongoDB | Armazenamento de usuários, máquinas e reservas |
+| Hospedagem | Render | Plataforma Cloud para serviços web e banco de dados |
 
 ---
 
 ## 🗂️ Estrutura do Projeto
 
 ```
-fablabsystem/
+FabLabSystem/
 ├── public/
-│   ├── logo.svg                # Logo vetorial do FabLabSystem
-│   ├── icon-192.png            # Ícone PWA 192×192
-│   ├── icon-512.png            # Ícone PWA 512×512
-│   ├── manifest.json          # Manifesto PWA
-│   └── sw.js                  # Service Worker para cache e modo offline
+│   ├── favicon.ico             # Ícone do navegador
+│   └── logo.svg                # Logo do projeto
 │
 ├── src/
-│   ├── App.jsx                 # Roteamento central e gerenciamento de sessões
-│   ├── main.jsx                # Ponto de entrada do React
+│   ├── assets/                 # Imagens, ícones e arquivos estáticos
+│   ├── components/             # Componentes reutilizáveis da interface
+│   │   ├── common/             # Botões, inputs, modais e cards
+│   │   ├── layout/             # Header, Sidebar e Footer
+│   │   ├── machines/           # Componentes relativos às máquinas
+│   │   └── schedule/           # Componentes de agendamento
 │   │
-│   ├── hooks/
-│   │   ├── useAuth.js          # Autenticação e perfil do usuário no Supabase
-│   │   ├── useMachines.js      # Gerenciamento de máquinas e status
-│   │   ├── useReservations.js  # CRUD de agendamentos e verificação de conflitos
-│   │   ├── useInventory.js     # Controle de insumos e movimentações
-│   │   └── useTheme.js         # Controle de tema claro/escuro
+│   ├── context/                # Contextos globais (AuthContext, ThemeContext)
+│   ├── hooks/                  # Custom hooks para requisições e estados
+│   ├── pages/                  # Páginas principais (Dashboard, Máquinas, Reservas, Estoque)
+│   ├── services/               # Clientes de API e comunicação com backend
+│   ├── styles/                 # Arquivos de estilo global
+│   ├── utils/                  # Utilitários de formatação de datas e validações
 │   │
-│   ├── pages/
-│   │   ├── DashboardPage.jsx  # Indicadores gerais e resumo operacional
-│   │   ├── MachinesPage.jsx   # Listagem e controle de máquinas
-│   │   ├── SchedulePage.jsx   # Calendário e criação de reservas
-│   │   ├── InventoryPage.jsx  # Gestão de estoque e insumos
-│   │   ├── ProjectsPage.jsx   # Portfólio de projetos abertos da comunidade
-│   │   ├── UsersPage.jsx      # Gestão de membros e habilitações
-│   │   └── SettingsPage.jsx   # Configurações do laboratório
-│   │
-│   ├── components/
-│   │   ├── machines/
-│   │   │   ├── MachineCard.jsx    # Card com status e ações rápidas da máquina
-│   │   │   └── MachineModal.jsx   # Modal de criação/edição de equipamento
-│   │   ├── schedule/
-│   │   │   ├── CalendarView.jsx   # Componente visual da grade de horários
-│   │   │   └── ReserveModal.jsx   # Modal de confirmação de agendamento
-│   │   ├── inventory/
-│   │   │   └── StockItemModal.jsx # Modal de movimentação de material
-│   │   ├── ui/
-│   │   │   ├── BadgeTag.jsx       # Componente visual para badges de segurança
-│   │   │   └── StatCard.jsx       # Card de indicador para o dashboard
-│   │   └── layout/
-│   │       ├── Header.jsx
-│   │       ├── Sidebar.jsx
-│   │       └── Footer.jsx
-│   │
-│   └── utils/
-│       ├── supabase.js         # Conexão e cliente Supabase
-│       ├── date.js             # Formatação e manipulação de horários de reserva
-│       └── validators.js       # Validações de formulários e permissões
+│   ├── App.jsx                 # Roteamento central da aplicação
+│   └── main.jsx                # Ponto de entrada do React
 │
-├── .github/
-│   └── workflows/
-│       └── deploy.yml          # Pipeline CI/CD para deploy automático
-│
-├── vite.config.js              # Configurações do Vite e aliases
-├── tailwind.config.js          # Configuração de temas e cores do Tailwind CSS
+├── .env.example                # Exemplo de variáveis de ambiente
+├── vite.config.js              # Configurações do Vite
 └── package.json
 ```
 
 ---
 
-## 🗄️ Schema do Banco (Supabase / PostgreSQL)
+## 🗄️ Modelo de Dados (Schema Simplificado)
 
 ```sql
--- Perfis de Usuários e Roles
-profiles (
-  id              uuid PRIMARY KEY REFERENCES auth.users,
-  full_name       text NOT NULL,
-  avatar_url      text,
-  role            text CHECK (role IN ('admin', 'manager', 'monitor', 'maker')) DEFAULT 'maker',
-  bio             text,
-  phone           text,
-  created_at      timestamptz DEFAULT now()
+-- Usuários do Sistema
+users (
+  id          UUID PRIMARY KEY,
+  name        VARCHAR(100) NOT NULL,
+  email       VARCHAR(100) UNIQUE NOT NULL,
+  role        VARCHAR(20) DEFAULT 'maker', -- 'admin', 'manager', 'maker'
+  created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Máquinas e Equipamentos
+-- Parque de Máquinas
 machines (
-  id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name                    text NOT NULL,
-  category                text NOT NULL, -- '3d_printer', 'laser_cutter', 'cnc', 'electronics', 'other'
-  description             text,
-  status                  text CHECK (status IN ('available', 'in_use', 'maintenance', 'offline')) DEFAULT 'available',
-  requires_certification  boolean DEFAULT true,
-  max_reservation_hours  integer DEFAULT 2,
-  image_url               text,
-  created_at              timestamptz DEFAULT now()
+  id          UUID PRIMARY KEY,
+  name        VARCHAR(100) NOT NULL,
+  category    VARCHAR(50) NOT NULL,
+  status      VARCHAR(20) DEFAULT 'available', -- 'available', 'in_use', 'maintenance'
+  description TEXT
 );
 
--- Habilitações e Certificações
-certifications (
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name        text NOT NULL,
-  description text,
-  machine_id  uuid REFERENCES machines(id) ON DELETE CASCADE,
-  created_at  timestamptz DEFAULT now()
-);
-
--- Vínculo Usuário <-> Certificação
-user_certifications (
-  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id          uuid REFERENCES profiles(id) ON DELETE CASCADE,
-  certification_id uuid REFERENCES certifications(id) ON DELETE CASCADE,
-  granted_by       uuid REFERENCES profiles(id),
-  granted_at       timestamptz DEFAULT now()
-);
-
--- Agendamentos e Reservas
+-- Reservas de Horário
 reservations (
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id     uuid REFERENCES profiles(id) ON DELETE CASCADE,
-  machine_id  uuid REFERENCES machines(id) ON DELETE CASCADE,
-  start_time  timestamptz NOT NULL,
-  end_time    timestamptz NOT NULL,
-  status      text CHECK (status IN ('scheduled', 'in_progress', 'completed', 'cancelled')) DEFAULT 'scheduled',
-  notes       text,
-  created_at  timestamptz DEFAULT now()
+  id          UUID PRIMARY KEY,
+  user_id     UUID REFERENCES users(id),
+  machine_id  UUID REFERENCES machines(id),
+  start_time  TIMESTAMP NOT NULL,
+  end_time    TIMESTAMP NOT NULL,
+  status      VARCHAR(20) DEFAULT 'confirmed'
 );
 
--- Controle de Estoque de Insumos
+-- Insumos e Materiais
 inventory (
-  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name          text NOT NULL,
-  category      text NOT NULL, -- 'filament', 'mdf', 'acrylic', 'components', 'tools'
-  quantity      numeric DEFAULT 0,
-  unit          text NOT NULL, -- 'g', 'kg', 'm2', 'units'
-  min_quantity  numeric DEFAULT 5,
-  unit_cost     numeric DEFAULT 0,
-  location      text,
-  updated_at    timestamptz DEFAULT now()
-);
-
--- Portfólio de Projetos
-projects (
-  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  author_id    uuid REFERENCES profiles(id) ON DELETE CASCADE,
-  title        text NOT NULL,
-  description  text,
-  repository   text,
-  license      text DEFAULT 'CC-BY-SA-4.0',
-  images       jsonb DEFAULT '[]',
-  created_at   timestamptz DEFAULT now()
+  id          UUID PRIMARY KEY,
+  name        VARCHAR(100) NOT NULL,
+  quantity    NUMERIC NOT NULL DEFAULT 0,
+  unit        VARCHAR(20) NOT NULL, -- 'g', 'kg', 'm2', 'un'
+  min_stock   NUMERIC DEFAULT 5
 );
 ```
 
@@ -260,11 +159,10 @@ projects (
 ## ⚙️ Rodando Localmente
 
 ### Pré-requisitos
-- **Node.js** (versão 18 ou superior)
-- npm ou yarn
-- Uma conta no [Supabase](https://supabase.io) (gratuita)
+- **Node.js** (v18 ou superior)
+- **npm** ou **yarn**
 
-### Passo a passo
+### Passo a Passo
 
 ```bash
 # 1. Clone o repositório
@@ -276,86 +174,54 @@ npm install
 
 # 3. Configure as variáveis de ambiente
 cp .env.example .env
+# Preencha o arquivo .env com suas configurações locais
 
-# Edite o arquivo .env com suas credenciais do Supabase:
-# VITE_SUPABASE_URL=https://sua-instancia.supabase.co
-# VITE_SUPABASE_ANON_KEY=sua-chave-anonima-aqui
-
-# 4. Execute o servidor de desenvolvimento
+# 4. Inicie o servidor de desenvolvimento
 npm run dev
 
-# O app estará disponível em: http://localhost:5173
+# Acesse no navegador: http://localhost:5173
 ```
 
-### Build para Produção
+### Build de Produção
 
 ```bash
-# Compilar o projeto para produção
+# Compilar o código para produção
 npm run build
 
-# Os arquivos estáticos otimizados serão gerados na pasta /dist
+# Executar a pré-visualização da build
+npm run preview
 ```
 
 ---
 
 ## 🤝 Contribuindo
 
-O **FabLabSystem** é um projeto **open source** e contribuições da comunidade maker e desenvolvedora são muito bem-vindas!
+Contribuições são super bem-vindas! Se você deseja colaborar com o desenvolvimento do **FabLabSystem**:
 
-```bash
-# Fork → Clone → Branch → Commit → Push → Pull Request
-git checkout -b feature/sua-feature
-git commit -m "feat: adiciona controle de manutenção de máquinas"
-git push origin feature/sua-feature
-```
-
-### Ideias de contribuição
-- 🔌 Integração com leitores de QR Code e RFID/NFC para check-in
-- 📊 Novos gráficos estatísticos de consumo de insumos
-- 🌍 Suporte a múltiplos idiomas (i18n)
-- 🔔 Integração com Webhooks e Telegram/Discord para avisos de reservas
-- 🧪 Testes automatizados (Vitest + Playwright)
-- 📖 Melhorias na documentação e tutoriais de instalação
-
-### Diretrizes
-- Mantenha o padrão arquitetural do projeto (React hooks, componentes modulares e Tailwind)
-- Faça commits semânticos (`feat:`, `fix:`, `docs:`, `refactor:`)
-- Abra uma *issue* para discutir grandes alterações antes de enviar uma PR
+1. Faça um **Fork** do projeto
+2. Crie uma Branch para sua funcionalidade (`git checkout -b feature/NovaFuncionalidade`)
+3. Faça o **Commit** de suas alterações (`git commit -m 'feat: adiciona nova funcionalidade'`)
+4. Envie para o branch (`git push origin feature/NovaFuncionalidade`)
+5. Abra um **Pull Request**
 
 ---
 
 ## 📄 Licença
 
-```
-MIT License
-
-Copyright (c) 2025 gualvesx
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-```
-
-Veja o arquivo [LICENSE](LICENSE) para o texto completo.
+Este projeto está sob a licença **MIT**. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
 
 ---
 
 ## 👤 Autor
 
-Desenvolvido com ❤️ por **[gualvesx](https://github.com/gualvesx)**
+Desenvolvido por **[gualvesx](https://github.com/gualvesx)**
 
 ---
 
 <div align="center">
 
-**[🌐 Demo do Projeto](https://fablab.ynm.com.br)** · **[🐛 Reportar Bug](https://github.com/gualvesx/FabLabSystem/issues)** · **[⭐ GitHub](https://github.com/gualvesx/FabLabSystem)**
+**[🌐 fablabsystem-dcim.onrender.com](https://fablabsystem-dcim.onrender.com/)** · **[⭐ GitHub](https://github.com/gualvesx/FabLabSystem)**
 
-*Se este projeto é útil para o seu Fab Lab ou Makerspace, considere deixar uma ⭐ no repositório!*
+*Gostou do projeto? Deixe uma estrela no repositório para apoiar o desenvolvimento!*
 
 </div>
