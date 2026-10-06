@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="public/logo.svg" alt="FabLabSystem Logo" width="90" height="90" />
+<img src="public/logonavegador.ico" alt="FabLabSystem Logo" width="90" height="90" />
 
 # FabLabSystem · Gestão de Laboratórios
 
